@@ -541,8 +541,15 @@ class BattleSimulator {
   
   // Start battle
   startBattle() {
-    // Only start if we have fighters
+    console.log("startBattle called - checking conditions");
+    console.log("Current phase:", this.state.phase);
+    console.log("Fighter count:", this.state.fighters.length);
+    
+    // Only start if we have fighters AND we're in setup phase
     if (this.state.phase !== 'setup' || this.state.fighters.length === 0) {
+      console.log("Can't start battle - conditions not met:", 
+                "Phase:", this.state.phase, 
+                "Fighters:", this.state.fighters.length);
       return false;
     }
     
@@ -553,6 +560,7 @@ class BattleSimulator {
     
     // Switch to battle phase
     this.state.phase = 'battle';
+    console.log("Phase changed to:", this.state.phase);
     
     // Show battle UI
     this.ui.showBattleUI();
@@ -564,6 +572,7 @@ class BattleSimulator {
       this.ui.showTutorialTip('Use WASD to move, mouse to aim and attack, E to rally nearby fighters, F to change formation.', { x: window.innerWidth / 2, y: window.innerHeight / 2 }, 8000);
     }
     
+    console.log("Battle successfully started");
     return true;
   }
   
