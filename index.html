@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>People vs Animal Battle Simulator</title>
+    <title>People vs Animal Battle Simulator - Emergency Fix</title>
     <style>
         body {
             margin: 0;
@@ -17,49 +17,17 @@
             position: absolute;
             width: 100%;
             height: 100%;
-            z-index: 1; /* Ensure this is below UI */
-        }
-        
-        #loading-screen {
-            position: absolute;
-            width: 100%;
-            height: 100%;
-            background-color: #000;
-            color: #fff;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            z-index: 1000; /* Very high z-index */
-        }
-        
-        #loading-bar-container {
-            width: 80%;
-            max-width: 400px;
-            height: 20px;
-            background-color: #333;
-            border-radius: 10px;
-            margin-top: 20px;
-        }
-        
-        #loading-bar {
-            width: 0%;
-            height: 100%;
-            background-color: #4CAF50;
-            border-radius: 10px;
-            transition: width 0.3s;
         }
         
         #ui-container {
             position: absolute;
             width: 100%;
             height: 100%;
-            pointer-events: none; /* Don't block clicks */
-            z-index: 10;
+            pointer-events: none;
         }
         
         .ui-panel {
-            pointer-events: auto; /* Allow clicks on UI panels */
+            pointer-events: auto;
         }
         
         #setup-ui {
@@ -72,8 +40,6 @@
             padding: 15px;
             border-radius: 10px;
             text-align: center;
-            display: none;
-            z-index: 20; /* Ensure UI is above game canvas */
         }
         
         #battle-ui {
@@ -85,7 +51,6 @@
             padding: 10px;
             border-radius: 5px;
             display: none;
-            z-index: 20;
         }
         
         #result-ui {
@@ -99,7 +64,6 @@
             border-radius: 10px;
             text-align: center;
             display: none;
-            z-index: 20;
         }
         
         .btn {
@@ -112,56 +76,12 @@
             display: inline-block;
             font-size: 16px;
             margin: 10px 5px;
-            cursor: pointer !important; /* Force cursor */
+            cursor: pointer;
             border-radius: 5px;
-            transition: background-color 0.3s;
-            pointer-events: auto !important; /* Force pointer events */
-            position: relative; /* Ensure it works with z-index */
-            z-index: 25; /* Higher than panel */
-        }
-        
-        .btn:hover {
-            background-color: #45a049;
         }
         
         .btn-secondary {
             background-color: #666;
-        }
-        
-        .btn-secondary:hover {
-            background-color: #555;
-        }
-        
-        #animal-health-bar-container {
-            width: 200px;
-            height: 15px;
-            background-color: #333;
-            border-radius: 7px;
-            margin-top: 5px;
-        }
-        
-        #animal-health-bar {
-            width: 100%;
-            height: 100%;
-            background-color: #f44336;
-            border-radius: 7px;
-            transition: width 0.3s;
-        }
-        
-        #commander-health-bar-container {
-            width: 200px;
-            height: 15px;
-            background-color: #333;
-            border-radius: 7px;
-            margin-top: 5px;
-        }
-        
-        #commander-health-bar {
-            width: 100%;
-            height: 100%;
-            background-color: #2196F3;
-            border-radius: 7px;
-            transition: width 0.3s;
         }
         
         #formation-menu {
@@ -173,89 +93,10 @@
             padding: 10px;
             border-radius: 5px;
             display: none;
-            z-index: 20;
-        }
-        
-        .formation-btn {
-            margin: 5px;
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            border: 2px solid white;
-            background-color: rgba(255, 255, 255, 0.2);
-            cursor: pointer;
-            z-index: 25;
-        }
-        
-        .formation-btn.active {
-            background-color: rgba(76, 175, 80, 0.5);
-        }
-        
-        #mobile-controls {
-            position: absolute;
-            bottom: 100px;
-            left: 50%;
-            transform: translateX(-50%);
-            display: none;
-            z-index: 20;
-        }
-        
-        .control-btn {
-            width: 60px;
-            height: 60px;
-            background-color: rgba(255, 255, 255, 0.3);
-            border-radius: 50%;
-            border: 2px solid white;
-            margin: 5px;
-            display: inline-flex;
-            justify-content: center;
-            align-items: center;
-            font-size: 24px;
-            color: white;
-            user-select: none;
-            touch-action: manipulation;
-            z-index: 25;
-        }
-        
-        /* Debug overlay to help visualize issues */
-        #debug-overlay {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            background-color: rgba(0, 0, 0, 0.7);
-            color: white;
-            padding: 10px;
-            border-radius: 5px;
-            font-size: 12px;
-            z-index: 9999;
-        }
-        
-        /* Skip loading button for debug */
-        #skip-loading {
-            position: absolute;
-            top: 10px;
-            left: 10px;
-            z-index: 2000;
-            background-color: red;
-            color: white;
-            padding: 5px;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
         }
     </style>
 </head>
 <body>
-    <div id="loading-screen">
-        <h1>People vs Animal Battle Simulator</h1>
-        <p>Loading game assets...</p>
-        <div id="loading-bar-container">
-            <div id="loading-bar"></div>
-        </div>
-        <!-- Emergency skip button -->
-        <button id="skip-loading">Skip Loading</button>
-    </div>
-    
     <div id="game-container"></div>
     
     <div id="ui-container">
@@ -280,73 +121,10 @@
             </div>
         </div>
         
-        <!-- Battle Phase UI -->
-        <div id="battle-ui" class="ui-panel">
-            <div id="battle-stats">
-                <div>Time: <span id="battle-time">0:00</span></div>
-                <div>Fighters: <span id="fighters-alive">0</span>/<span id="fighters-total">0</span></div>
-                <div>Animal: <span id="animal-type">Gorilla</span></div>
-                <div>Animal Health:</div>
-                <div id="animal-health-bar-container">
-                    <div id="animal-health-bar"></div>
-                </div>
-                <div>Commander Health:</div>
-                <div id="commander-health-bar-container">
-                    <div id="commander-health-bar"></div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Formation Controls -->
-        <div id="formation-menu" class="ui-panel">
-            <div>Formations:</div>
-            <button class="formation-btn active" data-formation="circle" title="Circle">⭕</button>
-            <button class="formation-btn" data-formation="line" title="Line">—</button>
-            <button class="formation-btn" data-formation="arrow" title="Arrow">▲</button>
-            <button class="formation-btn" data-formation="scatter" title="Scatter">⚫</button>
-        </div>
-        
-        <!-- Mobile Controls -->
-        <div id="mobile-controls" class="ui-panel">
-            <div style="text-align: center;">
-                <div class="control-btn" id="control-up">↑</div>
-            </div>
-            <div style="text-align: center;">
-                <div class="control-btn" id="control-left">←</div>
-                <div class="control-btn" id="control-down">↓</div>
-                <div class="control-btn" id="control-right">→</div>
-            </div>
-            <div style="text-align: center; margin-top: 10px;">
-                <div class="control-btn" id="control-action">⚔️</div>
-            </div>
-        </div>
-        
-        <!-- Result Phase UI -->
-        <div id="result-ui" class="ui-panel">
-            <h2 id="result-title">Battle Results</h2>
-            <div id="result-stats">
-                <div>Final Score: <span id="final-score">0</span></div>
-                <div>Time: <span id="result-time">0:00</span></div>
-                <div>Fighters Lost: <span id="fighters-lost">0</span>/<span id="result-fighters-total">0</span></div>
-            </div>
-            <div id="achievements-list">
-                <!-- Achievements will be added here -->
-            </div>
-            <div>
-                <button id="restart-btn" class="btn">Play Again</button>
-                <button id="share-btn" class="btn">Share Results</button>
-            </div>
-        </div>
-    </div>
-    
-    <!-- Debug overlay -->
-    <div id="debug-overlay">
-        <div>Debug Info:</div>
-        <div id="debug-info"></div>
-        <div id="debug-buttons">
-            <button id="debug-force-start" style="font-size: 10px; padding: 2px;">Force Start Battle</button>
-            <button id="debug-toggle-ui" style="font-size: 10px; padding: 2px;">Toggle UI</button>
-        </div>
+        <!-- Battle & Result UIs - simplified for emergency fix -->
+        <div id="battle-ui" class="ui-panel"></div>
+        <div id="result-ui" class="ui-panel"></div>
+        <div id="formation-menu" class="ui-panel"></div>
     </div>
     
     <!-- Load libraries -->
@@ -361,171 +139,82 @@
     <script src="js/ui-manager.js"></script>
     <script src="js/input-manager.js"></script>
     
-    <!-- Main script -->
+    <!-- Simple initialization script -->
     <script>
-        // Check if any scripts failed to load
-        window.addEventListener('error', function(e) {
-            console.error("Script loading error:", e);
-            document.getElementById('loading-screen').innerHTML = 
-                '<h1>Error Loading Game</h1>' +
-                '<p>An error occurred while loading game assets. Please check console for details.</p>' +
-                '<p>Error: ' + e.message + '</p>' +
-                '<button onclick="window.location.reload()">Reload</button>';
-        }, true);
-        
-        // Manual fade functions for loading screen
-        function fadeOut(element, duration) {
-            element.style.opacity = 1;
-            element.style.transition = `opacity ${duration}ms`;
-            setTimeout(() => {
-                element.style.opacity = 0;
-                setTimeout(() => {
-                    element.style.display = 'none';
-                }, duration);
-            }, 10);
-        }
-        
-        // Initialize loading system
-        let loadingProgress = 0;
-        const loadingBar = document.getElementById('loading-bar');
-        const loadingScreen = document.getElementById('loading-screen');
-        
-        // Skip loading button for emergency use
-        document.getElementById('skip-loading').addEventListener('click', function() {
-            console.log("Skipping loading...");
-            loadingScreen.style.display = 'none';
-            initGame();
-        });
-        
-        function updateLoadingProgress(progress) {
-            loadingProgress = Math.min(100, progress);
-            loadingBar.style.width = loadingProgress + '%';
-            console.log("Loading progress:", loadingProgress + "%");
-            
-            if (loadingProgress >= 100) {
-                console.log("Loading complete, starting game...");
-                setTimeout(() => {
-                    // Simple display none instead of fancy hiding
-                    loadingScreen.style.display = 'none';
-                    initGame();
-                }, 500);
-            }
-        }
-        
-        // Mock asset loading
-        console.log("Starting asset loading...");
-        const assetsToLoad = 5;
-        let assetsLoaded = 0;
-        
-        function assetLoaded() {
-            assetsLoaded++;
-            console.log(`Asset loaded: ${assetsLoaded}/${assetsToLoad}`);
-            updateLoadingProgress((assetsLoaded / assetsToLoad) * 100);
-        }
-        
-        // Start immediate loading
-        for (let i = 0; i < assetsToLoad; i++) {
-            setTimeout(assetLoaded, 300 * (i + 1));
-        }
-        
-        // Detect mobile devices
-        function isMobileDevice() {
-            // Always return false for testing
-            return false;
-        }
-        
-        // Initialize game
-        function initGame() {
-            console.log("Initializing game...");
-            
+        // Wait for all scripts to load
+        window.addEventListener('load', function() {
+            // Initialize game
             try {
+                console.log("Creating game instance...");
+                
                 // Create game instance
                 window.game = new BattleSimulator({
-                    container: document.getElementById('game-container'),
-                    isMobile: isMobileDevice()
+                    container: document.getElementById('game-container')
                 });
                 
-                console.log("Game instance created:", window.game);
+                console.log("Game created, setting up event handlers");
                 
-                // Show UI
-                document.getElementById('setup-ui').style.display = 'block';
+                // Make sure we see the setup UI
+                game.ui.showSetupUI();
                 
-                // Direct button click handlers
-                const startBattleBtn = document.getElementById('start-battle-btn');
-                if (startBattleBtn) {
-                    startBattleBtn.onclick = function() {
-                        console.log("Start battle button clicked");
-                        if (window.game) {
-                            const result = window.game.startBattle();
-                            console.log("Battle start result:", result);
-                        } else {
-                            console.error("Game instance not found!");
-                        }
-                        return false;
-                    };
-                }
+                // Set up button handlers
+                document.getElementById('start-battle-btn').onclick = function() {
+                    console.log("Start battle clicked");
+                    game.startBattle();
+                };
                 
                 document.getElementById('clear-fighters-btn').onclick = function() {
-                    console.log("Clear fighters button clicked");
-                    window.game.clearFighters();
+                    console.log("Clear fighters clicked");
+                    game.clearFighters();
                 };
                 
-                document.getElementById('restart-btn').onclick = function() {
-                    console.log("Restart button clicked");
-                    window.game.setupBattle();
+                // Fix for the raycaster - patch the placeFighter method to validate ground hits
+                const originalPlaceFighter = game.placeFighter;
+                
+                game.placeFighter = function(position) {
+                    console.log("Place fighter at:", position);
+                    
+                    // Get the ground height - battlefield should be at y=0
+                    if (position.y > 0.5) { 
+                        console.log("Invalid height, ignoring: " + position.y);
+                        return null; // Not on the ground
+                    }
+                    
+                    // Only add fighters within the arena bounds
+                    const arenaSize = this.config.arenaSize / 2;
+                    if (Math.abs(position.x) > arenaSize || Math.abs(position.z) > arenaSize) {
+                        console.log("Outside arena bounds, ignoring");
+                        return null; // Outside arena
+                    }
+                    
+                    // Call original method with validated position
+                    position.y = 0; // Force to ground level
+                    return originalPlaceFighter.call(this, position);
                 };
                 
-                document.getElementById('share-btn').onclick = function() {
-                    alert('Sharing results... (To be implemented)');
+                // Fix for the fighter counter - make sure UI only updates on actual fighter creation
+                const originalCreateFighter = game.createFighter;
+                
+                game.createFighter = function(position) {
+                    const fighter = originalCreateFighter.call(this, position);
+                    
+                    // Only update UI if fighter was actually created
+                    if (fighter) {
+                        this.ui.updateSetupUI();
+                    }
+                    
+                    return fighter;
                 };
                 
-                document.getElementById('animal-select').onchange = function(e) {
-                    console.log("Animal selection changed to:", e.target.value);
-                    window.game.config.animalType = e.target.value;
-                };
-                
-                // Debug info
-                updateDebugInfo();
-                
-                console.log("Game initialization complete");
+                console.log("Emergency fix applied successfully");
             } catch (error) {
                 console.error("Error initializing game:", error);
                 document.body.innerHTML = 
-                    '<div style="color: white; background: black; padding: 20px; position: absolute; top: 0; left: 0; right: 0; bottom: 0; display: flex; flex-direction: column; justify-content: center; align-items: center;">' +
+                    '<div style="color: white; padding: 20px;">' +
                     '<h1>Game Initialization Error</h1>' +
-                    '<p>An error occurred while initializing the game:</p>' +
-                    '<pre style="background: #333; padding: 10px; max-width: 80%; overflow: auto;">' + error.stack + '</pre>' +
-                    '<button onclick="window.location.reload()" style="padding: 10px 20px; margin-top: 20px;">Reload</button>' +
+                    '<p>' + error.message + '</p>' +
+                    '<pre>' + error.stack + '</pre>' +
                     '</div>';
-            }
-        }
-        
-        function updateDebugInfo() {
-            const debugInfo = document.getElementById('debug-info');
-            if (!debugInfo) return;
-            
-            let infoText = '';
-            
-            if (window.game) {
-                infoText += `Phase: ${window.game.state.phase}<br>`;
-                infoText += `Fighters: ${window.game.state.fighters.length}<br>`;
-                infoText += `Animal: ${window.game.config.animalType}<br>`;
-                infoText += `Setup UI: ${document.getElementById('setup-ui').style.display}<br>`;
-            } else {
-                infoText = 'Game not initialized';
-            }
-            
-            debugInfo.innerHTML = infoText;
-            
-            // Update regularly
-            setTimeout(updateDebugInfo, 1000);
-        }
-        
-        // Add keyboard shortcut for space to start battle
-        document.addEventListener('keydown', function(e) {
-            if (e.code === 'Space' && window.game && window.game.state.phase === 'setup') {
-                console.log("Space pressed, trying to start battle");
-                window.game.startBattle();
             }
         });
     </script>
