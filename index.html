@@ -353,7 +353,8 @@
             
             // Setup event listeners
             document.getElementById('start-battle-btn').addEventListener('click', () => {
-                game.startBattle();
+                console.log ("Start button clicked");
+                window.game.startBattle(); // Use explicit window.game reference
             });
             
             document.getElementById('clear-fighters-btn').addEventListener('click', () => {
