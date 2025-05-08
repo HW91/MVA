@@ -33,10 +33,6 @@
             z-index: 1000; /* Very high z-index */
         }
         
-        #loading-screen.hidden {
-            display: none !important; /* Force hide */
-        }
-        
         #loading-bar-container {
             width: 80%;
             max-width: 400px;
@@ -200,7 +196,7 @@
             bottom: 100px;
             left: 50%;
             transform: translateX(-50%);
-            display: none !important; /* Force hide initially */
+            display: none;
             z-index: 20;
         }
         
@@ -232,7 +228,20 @@
             border-radius: 5px;
             font-size: 12px;
             z-index: 9999;
-            display: none;
+        }
+        
+        /* Skip loading button for debug */
+        #skip-loading {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 2000;
+            background-color: red;
+            color: white;
+            padding: 5px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
         }
     </style>
 </head>
@@ -243,6 +252,8 @@
         <div id="loading-bar-container">
             <div id="loading-bar"></div>
         </div>
+        <!-- Emergency skip button -->
+        <button id="skip-loading">Skip Loading</button>
     </div>
     
     <div id="game-container"></div>
@@ -352,11 +363,26 @@
     
     <!-- Main script -->
     <script>
-        // Enable debug mode (for development)
-        const DEBUG = true;
+        // Check if any scripts failed to load
+        window.addEventListener('error', function(e) {
+            console.error("Script loading error:", e);
+            document.getElementById('loading-screen').innerHTML = 
+                '<h1>Error Loading Game</h1>' +
+                '<p>An error occurred while loading game assets. Please check console for details.</p>' +
+                '<p>Error: ' + e.message + '</p>' +
+                '<button onclick="window.location.reload()">Reload</button>';
+        }, true);
         
-        if (DEBUG) {
-            document.getElementById('debug-overlay').style.display = 'block';
+        // Manual fade functions for loading screen
+        function fadeOut(element, duration) {
+            element.style.opacity = 1;
+            element.style.transition = `opacity ${duration}ms`;
+            setTimeout(() => {
+                element.style.opacity = 0;
+                setTimeout(() => {
+                    element.style.display = 'none';
+                }, duration);
+            }, 10);
         }
         
         // Initialize loading system
@@ -364,183 +390,144 @@
         const loadingBar = document.getElementById('loading-bar');
         const loadingScreen = document.getElementById('loading-screen');
         
+        // Skip loading button for emergency use
+        document.getElementById('skip-loading').addEventListener('click', function() {
+            console.log("Skipping loading...");
+            loadingScreen.style.display = 'none';
+            initGame();
+        });
+        
         function updateLoadingProgress(progress) {
             loadingProgress = Math.min(100, progress);
             loadingBar.style.width = loadingProgress + '%';
+            console.log("Loading progress:", loadingProgress + "%");
             
             if (loadingProgress >= 100) {
+                console.log("Loading complete, starting game...");
                 setTimeout(() => {
-                    // Ensure loading screen is completely removed
-                    loadingScreen.classList.add('hidden');
+                    // Simple display none instead of fancy hiding
+                    loadingScreen.style.display = 'none';
                     initGame();
                 }, 500);
             }
         }
         
-        // Mock asset loading (replace with actual asset loading later)
-        let assetsToLoad = 5;
+        // Mock asset loading
+        console.log("Starting asset loading...");
+        const assetsToLoad = 5;
         let assetsLoaded = 0;
         
         function assetLoaded() {
             assetsLoaded++;
+            console.log(`Asset loaded: ${assetsLoaded}/${assetsToLoad}`);
             updateLoadingProgress((assetsLoaded / assetsToLoad) * 100);
+        }
+        
+        // Start immediate loading
+        for (let i = 0; i < assetsToLoad; i++) {
+            setTimeout(assetLoaded, 300 * (i + 1));
         }
         
         // Detect mobile devices
         function isMobileDevice() {
-            // For testing - disable mobile detection
+            // Always return false for testing
             return false;
-            
-            // Normal detection (uncomment later)
-            // return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
         }
         
         // Initialize game
         function initGame() {
             console.log("Initializing game...");
             
-            // Create game instance
-            window.game = new BattleSimulator({
-                container: document.getElementById('game-container'),
-                isMobile: isMobileDevice()
-            });
-            
-            console.log("Game instance created:", window.game);
-            
-            // Update debug info
-            updateDebugInfo();
-            
-            // Direct button click handlers (bypassing addEventListener)
-            const startBattleBtn = document.getElementById('start-battle-btn');
-            if (startBattleBtn) {
-                startBattleBtn.onclick = function(e) {
-                    console.log("Start button direct click");
-                    if (window.game) {
-                        const result = window.game.startBattle();
-                        console.log("Battle start result:", result);
-                        
-                        // Only show mobile controls during battle phase
-                        const mobileControls = document.getElementById('mobile-controls');
-                        if (result && isMobileDevice()) {
-                            mobileControls.style.display = 'block';
+            try {
+                // Create game instance
+                window.game = new BattleSimulator({
+                    container: document.getElementById('game-container'),
+                    isMobile: isMobileDevice()
+                });
+                
+                console.log("Game instance created:", window.game);
+                
+                // Show UI
+                document.getElementById('setup-ui').style.display = 'block';
+                
+                // Direct button click handlers
+                const startBattleBtn = document.getElementById('start-battle-btn');
+                if (startBattleBtn) {
+                    startBattleBtn.onclick = function() {
+                        console.log("Start battle button clicked");
+                        if (window.game) {
+                            const result = window.game.startBattle();
+                            console.log("Battle start result:", result);
+                        } else {
+                            console.error("Game instance not found!");
                         }
-                        
-                        // Alert for visual feedback
-                        if (!result) {
-                            alert("Could not start battle. Check console for details.");
-                        }
-                    } else {
-                        console.error("Game instance not found!");
-                    }
-                    return false;
-                };
-                console.log("Direct start button handler installed");
-            } else {
-                console.error("Start button not found!");
-            }
-            
-            document.getElementById('clear-fighters-btn').onclick = function() {
-                console.log("Clear fighters button clicked");
-                window.game.clearFighters();
-            };
-            
-            document.getElementById('restart-btn').onclick = function() {
-                console.log("Restart button clicked");
-                window.game.setupBattle();
-                
-                // Hide mobile controls when going back to setup
-                document.getElementById('mobile-controls').style.display = 'none';
-            };
-            
-            document.getElementById('share-btn').onclick = function() {
-                // Implement sharing functionality
-                alert('Sharing results... (To be implemented)');
-            };
-            
-            document.getElementById('animal-select').onchange = function(e) {
-                console.log("Animal selection changed to:", e.target.value);
-                window.game.config.animalType = e.target.value;
-            };
-            
-            // Debug buttons
-            if (DEBUG) {
-                document.getElementById('debug-force-start').onclick = function() {
-                    console.log("Debug: Force start battle");
-                    if (window.game) {
-                        // Force phase to setup to ensure it starts
-                        window.game.state.phase = 'setup';
-                        // Ensure we have at least one fighter
-                        if (window.game.state.fighters.length === 0) {
-                            window.game.createFighter(new THREE.Vector3(0, 0, 5));
-                        }
-                        const result = window.game.startBattle();
-                        console.log("Force battle start result:", result);
-                    }
-                };
-                
-                document.getElementById('debug-toggle-ui').onclick = function() {
-                    const setupUI = document.getElementById('setup-ui');
-                    setupUI.style.display = setupUI.style.display === 'none' ? 'block' : 'none';
-                };
-            }
-            
-            // Setup formation buttons
-            const formationButtons = document.querySelectorAll('.formation-btn');
-            formationButtons.forEach(btn => {
-                btn.onclick = function() {
-                    console.log("Formation button clicked:", btn.dataset.formation);
-                    formationButtons.forEach(b => b.classList.remove('active'));
-                    btn.classList.add('active');
-                    window.game.fighterAI.setFormation(btn.dataset.formation);
-                };
-            });
-            
-            // Setup mobile controls if needed
-            if (isMobileDevice()) {
-                // Controls are hidden initially and only shown during battle
-                
-                // Touch controls
-                const touchControls = {
-                    up: document.getElementById('control-up'),
-                    down: document.getElementById('control-down'),
-                    left: document.getElementById('control-left'),
-                    right: document.getElementById('control-right'),
-                    action: document.getElementById('control-action')
-                };
-                
-                // Touch states
-                const touchStates = {
-                    up: false,
-                    down: false,
-                    left: false,
-                    right: false,
-                    action: false
-                };
-                
-                // Touch event handlers
-                for (const [direction, element] of Object.entries(touchControls)) {
-                    element.addEventListener('touchstart', () => {
-                        touchStates[direction] = true;
-                        element.style.backgroundColor = 'rgba(255, 255, 255, 0.5)';
-                    });
-                    
-                    element.addEventListener('touchend', () => {
-                        touchStates[direction] = false;
-                        element.style.backgroundColor = 'rgba(255, 255, 255, 0.3)';
-                    });
+                        return false;
+                    };
                 }
                 
-                // Send touch states to game
-                setInterval(() => {
-                    if (window.game && window.game.state.phase === 'battle') {
-                        if (touchStates.up) window.game.input.keys['KeyW'] = true;
-                        else window.game.input.keys['KeyW'] = false;
-                        
-                        if (touchStates.down) window.game.input.keys['KeyS'] = true;
-                        else window.game.input.keys['KeyS'] = false;
-                        
-                        if (touchStates.left) window.game.input.keys['KeyA'] = true;
-                        else window.game.input.keys['KeyA'] = false;
-                        
-                        if (touchStates.right) window.game.input.keys['KeyD'] = true;
-          
+                document.getElementById('clear-fighters-btn').onclick = function() {
+                    console.log("Clear fighters button clicked");
+                    window.game.clearFighters();
+                };
+                
+                document.getElementById('restart-btn').onclick = function() {
+                    console.log("Restart button clicked");
+                    window.game.setupBattle();
+                };
+                
+                document.getElementById('share-btn').onclick = function() {
+                    alert('Sharing results... (To be implemented)');
+                };
+                
+                document.getElementById('animal-select').onchange = function(e) {
+                    console.log("Animal selection changed to:", e.target.value);
+                    window.game.config.animalType = e.target.value;
+                };
+                
+                // Debug info
+                updateDebugInfo();
+                
+                console.log("Game initialization complete");
+            } catch (error) {
+                console.error("Error initializing game:", error);
+                document.body.innerHTML = 
+                    '<div style="color: white; background: black; padding: 20px; position: absolute; top: 0; left: 0; right: 0; bottom: 0; display: flex; flex-direction: column; justify-content: center; align-items: center;">' +
+                    '<h1>Game Initialization Error</h1>' +
+                    '<p>An error occurred while initializing the game:</p>' +
+                    '<pre style="background: #333; padding: 10px; max-width: 80%; overflow: auto;">' + error.stack + '</pre>' +
+                    '<button onclick="window.location.reload()" style="padding: 10px 20px; margin-top: 20px;">Reload</button>' +
+                    '</div>';
+            }
+        }
+        
+        function updateDebugInfo() {
+            const debugInfo = document.getElementById('debug-info');
+            if (!debugInfo) return;
+            
+            let infoText = '';
+            
+            if (window.game) {
+                infoText += `Phase: ${window.game.state.phase}<br>`;
+                infoText += `Fighters: ${window.game.state.fighters.length}<br>`;
+                infoText += `Animal: ${window.game.config.animalType}<br>`;
+                infoText += `Setup UI: ${document.getElementById('setup-ui').style.display}<br>`;
+            } else {
+                infoText = 'Game not initialized';
+            }
+            
+            debugInfo.innerHTML = infoText;
+            
+            // Update regularly
+            setTimeout(updateDebugInfo, 1000);
+        }
+        
+        // Add keyboard shortcut for space to start battle
+        document.addEventListener('keydown', function(e) {
+            if (e.code === 'Space' && window.game && window.game.state.phase === 'setup') {
+                console.log("Space pressed, trying to start battle");
+                window.game.startBattle();
+            }
+        });
+    </script>
+</body>
+</html>
