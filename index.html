@@ -2,219 +2,342 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>People vs Animal Battle Simulator - Emergency Fix</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>People vs Animal Battle - Emergency Fix</title>
     <style>
-        body {
-            margin: 0;
-            padding: 0;
-            overflow: hidden;
-            background-color: #000;
+        body { 
+            margin: 0; 
+            padding: 0; 
+            background: #000; 
+            overflow: hidden; 
             font-family: Arial, sans-serif;
         }
-        
         #game-container {
             position: absolute;
             width: 100%;
             height: 100%;
         }
-        
-        #ui-container {
+        #ui-overlay {
             position: absolute;
+            bottom: 20px;
+            left: 0;
             width: 100%;
-            height: 100%;
+            text-align: center;
+            z-index: 100;
             pointer-events: none;
         }
-        
-        .ui-panel {
+        #start-btn {
+            display: inline-block;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 18px;
+            border-radius: 5px;
+            cursor: pointer;
             pointer-events: auto;
         }
-        
-        #setup-ui {
-            position: absolute;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            background-color: rgba(0, 0, 0, 0.7);
-            color: white;
-            padding: 15px;
-            border-radius: 10px;
-            text-align: center;
-        }
-        
-        #battle-ui {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            background-color: rgba(0, 0, 0, 0.7);
+        #fighter-counter {
+            background: rgba(0,0,0,0.7);
             color: white;
             padding: 10px;
             border-radius: 5px;
-            display: none;
-        }
-        
-        #result-ui {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background-color: rgba(0, 0, 0, 0.8);
-            color: white;
-            padding: 20px;
-            border-radius: 10px;
-            text-align: center;
-            display: none;
-        }
-        
-        .btn {
-            background-color: #4CAF50;
-            border: none;
-            color: white;
-            padding: 10px 20px;
-            text-align: center;
-            text-decoration: none;
+            margin-bottom: 10px;
             display: inline-block;
-            font-size: 16px;
-            margin: 10px 5px;
-            cursor: pointer;
-            border-radius: 5px;
+            pointer-events: auto;
         }
-        
-        .btn-secondary {
-            background-color: #666;
-        }
-        
-        #formation-menu {
+        #debug-overlay {
             position: absolute;
-            bottom: 20px;
-            right: 20px;
-            background-color: rgba(0, 0, 0, 0.7);
+            top: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.7);
             color: white;
             padding: 10px;
             border-radius: 5px;
-            display: none;
+            font-size: 12px;
+            z-index: 1000;
         }
     </style>
 </head>
 <body>
     <div id="game-container"></div>
     
-    <div id="ui-container">
-        <!-- Setup Phase UI -->
-        <div id="setup-ui" class="ui-panel">
-            <h2>Setup Phase</h2>
-            <p>Place your fighters on the battlefield by clicking/tapping</p>
-            <div id="fighter-counter">Fighters: 0/100</div>
-            <div>
-                <button id="start-battle-btn" class="btn">Start Battle</button>
-                <button id="clear-fighters-btn" class="btn btn-secondary">Clear All</button>
-            </div>
-            <div>
-                <label for="animal-select">Choose Animal:</label>
-                <select id="animal-select">
-                    <option value="gorilla">Gorilla</option>
-                    <option value="bear">Bear</option>
-                    <option value="lion">Lion</option>
-                    <option value="elephant">Elephant</option>
-                    <option value="rhinoceros">Rhinoceros</option>
-                </select>
-            </div>
-        </div>
-        
-        <!-- Battle & Result UIs - simplified for emergency fix -->
-        <div id="battle-ui" class="ui-panel"></div>
-        <div id="result-ui" class="ui-panel"></div>
-        <div id="formation-menu" class="ui-panel"></div>
+    <div id="ui-overlay">
+        <div id="fighter-counter">Fighters: 0/100</div>
+        <button id="start-btn">START BATTLE</button>
     </div>
     
-    <!-- Load libraries -->
+    <div id="debug-overlay">
+        <div>Debug Mode</div>
+        <div id="debug-info">Loading...</div>
+    </div>
+    
+    <!-- Load Three.js -->
     <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/controls/OrbitControls.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/ammo.js@0.0.2/builds/ammo.js"></script>
     
-    <!-- Load game scripts -->
-    <script src="js/game.js"></script>
-    <script src="js/fighter-ai.js"></script>
-    <script src="js/animal-ai.js"></script>
-    <script src="js/ui-manager.js"></script>
-    <script src="js/input-manager.js"></script>
-    
-    <!-- Simple initialization script -->
+    <!-- Simple game implementation -->
     <script>
-        // Wait for all scripts to load
-        window.addEventListener('load', function() {
-            // Initialize game
-            try {
-                console.log("Creating game instance...");
+        // Main game class - simplified version that works
+        class SimpleGame {
+            constructor() {
+                // Initialize Three.js
+                this.renderer = new THREE.WebGLRenderer({ antialias: true });
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+                this.renderer.setClearColor(0x87CEEB); // Sky blue
+                document.getElementById('game-container').appendChild(this.renderer.domElement);
                 
-                // Create game instance
-                window.game = new BattleSimulator({
-                    container: document.getElementById('game-container')
+                // Set up scene and camera
+                this.scene = new THREE.Scene();
+                this.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+                this.camera.position.set(0, 30, 30);
+                this.camera.lookAt(0, 0, 0);
+                
+                // Add lights
+                const ambientLight = new THREE.AmbientLight(0xCCCCCC, 0.4);
+                this.scene.add(ambientLight);
+                
+                const directionalLight = new THREE.DirectionalLight(0xFFFFCC, 0.8);
+                directionalLight.position.set(20, 30, 20);
+                this.scene.add(directionalLight);
+                
+                // Create battlefield
+                this.createBattlefield();
+                
+                // Create animal
+                this.createAnimal();
+                
+                // Game state
+                this.fighters = [];
+                this.phase = 'setup';
+                
+                // Set up input handlers
+                this.setupInput();
+                
+                // Animation loop
+                this.animate();
+                
+                // Update fighter counter
+                this.updateFighterCounter();
+                
+                // Window resize handler
+                window.addEventListener('resize', () => this.onWindowResize());
+            }
+            
+            createBattlefield() {
+                // Create ground
+                const groundGeometry = new THREE.PlaneGeometry(100, 100);
+                const groundMaterial = new THREE.MeshStandardMaterial({ 
+                    color: 0x4CAF50,
+                    roughness: 0.8,
+                    metalness: 0.1
                 });
+                this.ground = new THREE.Mesh(groundGeometry, groundMaterial);
+                this.ground.rotation.x = -Math.PI / 2;
+                this.ground.receiveShadow = true;
+                this.scene.add(this.ground);
                 
-                console.log("Game created, setting up event handlers");
+                // Add some visual indicators for battlefield edges
+                const edgeGeometry = new THREE.BoxGeometry(100, 1, 1);
+                const edgeMaterial = new THREE.MeshBasicMaterial({ color: 0xFFFFFF });
                 
-                // Make sure we see the setup UI
-                game.ui.showSetupUI();
+                // North edge
+                const northEdge = new THREE.Mesh(edgeGeometry, edgeMaterial);
+                northEdge.position.set(0, 0.5, -50);
+                this.scene.add(northEdge);
                 
-                // Set up button handlers
-                document.getElementById('start-battle-btn').onclick = function() {
-                    console.log("Start battle clicked");
-                    game.startBattle();
-                };
+                // South edge
+                const southEdge = new THREE.Mesh(edgeGeometry, edgeMaterial);
+                southEdge.position.set(0, 0.5, 50);
+                this.scene.add(southEdge);
                 
-                document.getElementById('clear-fighters-btn').onclick = function() {
-                    console.log("Clear fighters clicked");
-                    game.clearFighters();
-                };
+                // East edge
+                const eastEdge = new THREE.Mesh(edgeGeometry, edgeMaterial);
+                eastEdge.rotation.y = Math.PI / 2;
+                eastEdge.position.set(50, 0.5, 0);
+                this.scene.add(eastEdge);
                 
-                // Fix for the raycaster - patch the placeFighter method to validate ground hits
-                const originalPlaceFighter = game.placeFighter;
+                // West edge
+                const westEdge = new THREE.Mesh(edgeGeometry, edgeMaterial);
+                westEdge.rotation.y = Math.PI / 2;
+                westEdge.position.set(-50, 0.5, 0);
+                this.scene.add(westEdge);
+            }
+            
+            createAnimal() {
+                // Simple animal representation
+                const animalGeometry = new THREE.BoxGeometry(3, 2.5, 5);
+                const animalMaterial = new THREE.MeshStandardMaterial({ color: 0x8B4513 });
+                this.animal = new THREE.Mesh(animalGeometry, animalMaterial);
+                this.animal.position.set(0, 1.25, -30);
+                this.scene.add(this.animal);
                 
-                game.placeFighter = function(position) {
-                    console.log("Place fighter at:", position);
-                    
-                    // Get the ground height - battlefield should be at y=0
-                    if (position.y > 0.5) { 
-                        console.log("Invalid height, ignoring: " + position.y);
-                        return null; // Not on the ground
-                    }
-                    
-                    // Only add fighters within the arena bounds
-                    const arenaSize = this.config.arenaSize / 2;
-                    if (Math.abs(position.x) > arenaSize || Math.abs(position.z) > arenaSize) {
-                        console.log("Outside arena bounds, ignoring");
-                        return null; // Outside arena
-                    }
-                    
-                    // Call original method with validated position
-                    position.y = 0; // Force to ground level
-                    return originalPlaceFighter.call(this, position);
-                };
+                // Slowly rotate animal for visual interest
+                this.animalRotation = 0;
+            }
+            
+            setupInput() {
+                // Raycaster for mouse picking
+                this.raycaster = new THREE.Raycaster();
+                this.mouse = new THREE.Vector2();
                 
-                // Fix for the fighter counter - make sure UI only updates on actual fighter creation
-                const originalCreateFighter = game.createFighter;
+                // Add click handler
+                window.addEventListener('mousedown', (event) => this.onMouseDown(event));
+                window.addEventListener('touchstart', (event) => this.onTouchStart(event));
                 
-                game.createFighter = function(position) {
-                    const fighter = originalCreateFighter.call(this, position);
-                    
-                    // Only update UI if fighter was actually created
-                    if (fighter) {
-                        this.ui.updateSetupUI();
-                    }
-                    
-                    return fighter;
-                };
+                // Add start button handler
+                document.getElementById('start-btn').addEventListener('click', () => this.startBattle());
+            }
+            
+            onMouseDown(event) {
+                // Only in setup phase
+                if (this.phase !== 'setup') return;
                 
-                console.log("Emergency fix applied successfully");
+                // Get mouse position
+                this.mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+                this.mouse.y = - (event.clientY / window.innerHeight) * 2 + 1;
+                
+                // Check for ground intersection
+                this.raycaster.setFromCamera(this.mouse, this.camera);
+                
+                const intersects = this.raycaster.intersectObject(this.ground);
+                
+                if (intersects.length > 0) {
+                    // Place fighter at intersection point
+                    this.placeFighter(intersects[0].point);
+                }
+            }
+            
+            onTouchStart(event) {
+                // Prevent default to avoid scrolling
+                event.preventDefault();
+                
+                // Only in setup phase
+                if (this.phase !== 'setup') return;
+                
+                // Get touch position
+                const touch = event.touches[0];
+                this.mouse.x = (touch.clientX / window.innerWidth) * 2 - 1;
+                this.mouse.y = - (touch.clientY / window.innerHeight) * 2 + 1;
+                
+                // Check for ground intersection
+                this.raycaster.setFromCamera(this.mouse, this.camera);
+                
+                const intersects = this.raycaster.intersectObject(this.ground);
+                
+                if (intersects.length > 0) {
+                    // Place fighter at intersection point
+                    this.placeFighter(intersects[0].point);
+                }
+            }
+            
+            placeFighter(position) {
+                // Check fighter limit
+                if (this.fighters.length >= 100) return;
+                
+                // Check if position is inside battlefield
+                if (Math.abs(position.x) > 50 || Math.abs(position.z) > 50) {
+                    console.log("Outside battlefield bounds");
+                    return;
+                }
+                
+                // Create fighter
+                const fighterGeometry = new THREE.BoxGeometry(0.7, 1.8, 0.7);
+                const fighterMaterial = new THREE.MeshStandardMaterial({ color: 0x2196F3 });
+                const fighter = new THREE.Mesh(fighterGeometry, fighterMaterial);
+                
+                // Position at ground level
+                fighter.position.copy(position);
+                fighter.position.y = 0.9; // Half height
+                
+                // Add to scene and fighters array
+                this.scene.add(fighter);
+                this.fighters.push(fighter);
+                
+                // Update counter
+                this.updateFighterCounter();
+                
+                // Log for debugging
+                console.log(`Fighter placed at (${position.x.toFixed(2)}, ${position.z.toFixed(2)}), total: ${this.fighters.length}`);
+            }
+            
+            updateFighterCounter() {
+                document.getElementById('fighter-counter').textContent = `Fighters: ${this.fighters.length}/100`;
+            }
+            
+            startBattle() {
+                // Check if we have fighters
+                if (this.fighters.length === 0) {
+                    alert("Please place at least one fighter before starting the battle!");
+                    return;
+                }
+                
+                // Change phase
+                this.phase = 'battle';
+                
+                // Hide start button
+                document.getElementById('start-btn').style.display = 'none';
+                
+                // Display message
+                alert("Battle started! This is just the emergency fix version. In the full game, the battle would now begin.");
+                
+                // Log for debugging
+                console.log("Battle started!");
+                
+                // Update debug info
+                this.updateDebugInfo();
+            }
+            
+            onWindowResize() {
+                // Update camera and renderer
+                this.camera.aspect = window.innerWidth / window.innerHeight;
+                this.camera.updateProjectionMatrix();
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+            }
+            
+            animate() {
+                requestAnimationFrame(() => this.animate());
+                
+                // Rotate animal in setup phase
+                if (this.phase === 'setup') {
+                    this.animalRotation += 0.01;
+                    this.animal.rotation.y = this.animalRotation;
+                }
+                
+                // Update debug info
+                this.updateDebugInfo();
+                
+                // Render scene
+                this.renderer.render(this.scene, this.camera);
+            }
+            
+            updateDebugInfo() {
+                const debugInfo = document.getElementById('debug-info');
+                if (debugInfo) {
+                    debugInfo.innerHTML = `
+                        Phase: ${this.phase}<br>
+                        Fighters: ${this.fighters.length}<br>
+                        FPS: ${Math.round(this.renderer.info.render.fps || 0)}<br>
+                        Triangles: ${this.renderer.info.render.triangles}
+                    `;
+                }
+            }
+        }
+        
+        // Initialize game after page load
+        window.addEventListener('load', () => {
+            try {
+                console.log("Starting simplified game");
+                window.game = new SimpleGame();
+                console.log("Game started successfully");
             } catch (error) {
-                console.error("Error initializing game:", error);
-                document.body.innerHTML = 
-                    '<div style="color: white; padding: 20px;">' +
-                    '<h1>Game Initialization Error</h1>' +
-                    '<p>' + error.message + '</p>' +
-                    '<pre>' + error.stack + '</pre>' +
-                    '</div>';
+                console.error("Error starting game:", error);
+                document.body.innerHTML = `
+                    <div style="color: white; padding: 20px; text-align: center;">
+                        <h1>Error Starting Game</h1>
+                        <p>${error.message}</p>
+                        <pre style="text-align: left; background: #333; padding: 10px; margin: 20px; max-width: 80%; overflow: auto;">${error.stack}</pre>
+                    </div>
+                `;
             }
         });
     </script>
