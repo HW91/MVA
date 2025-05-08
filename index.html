@@ -345,24 +345,35 @@
         
         // Initialize game
         function initGame() {
+            console.log("Initializing game...");
+            
             // Create game instance
             window.game = new BattleSimulator({
                 container: document.getElementById('game-container'),
                 isMobile: isMobileDevice()
             });
             
-            // Setup event listeners
+            console.log("Game instance created:", window.game);
+            
+            // Setup event listeners with improved logging
             document.getElementById('start-battle-btn').addEventListener('click', () => {
-                console.log ("Start button clicked");
-                window.game.startBattle(); // Use explicit window.game reference
+                console.log("Start button clicked");
+                if (window.game) {
+                    const result = window.game.startBattle();
+                    console.log("Battle start result:", result);
+                } else {
+                    console.error("Game instance not found!");
+                }
             });
             
             document.getElementById('clear-fighters-btn').addEventListener('click', () => {
-                game.clearFighters();
+                console.log("Clear fighters button clicked");
+                window.game.clearFighters();
             });
             
             document.getElementById('restart-btn').addEventListener('click', () => {
-                game.setupBattle();
+                console.log("Restart button clicked");
+                window.game.setupBattle();
             });
             
             document.getElementById('share-btn').addEventListener('click', () => {
@@ -371,16 +382,18 @@
             });
             
             document.getElementById('animal-select').addEventListener('change', (e) => {
-                game.config.animalType = e.target.value;
+                console.log("Animal selection changed to:", e.target.value);
+                window.game.config.animalType = e.target.value;
             });
             
             // Setup formation buttons
             const formationButtons = document.querySelectorAll('.formation-btn');
             formationButtons.forEach(btn => {
                 btn.addEventListener('click', () => {
+                    console.log("Formation button clicked:", btn.dataset.formation);
                     formationButtons.forEach(b => b.classList.remove('active'));
                     btn.classList.add('active');
-                    game.fighterAI.setFormation(btn.dataset.formation);
+                    window.game.fighterAI.setFormation(btn.dataset.formation);
                 });
             });
             
@@ -421,24 +434,26 @@
                 
                 // Send touch states to game
                 setInterval(() => {
-                    if (game && game.state.phase === 'battle') {
-                        if (touchStates.up) game.input.keys['KeyW'] = true;
-                        else game.input.keys['KeyW'] = false;
+                    if (window.game && window.game.state.phase === 'battle') {
+                        if (touchStates.up) window.game.input.keys['KeyW'] = true;
+                        else window.game.input.keys['KeyW'] = false;
                         
-                        if (touchStates.down) game.input.keys['KeyS'] = true;
-                        else game.input.keys['KeyS'] = false;
+                        if (touchStates.down) window.game.input.keys['KeyS'] = true;
+                        else window.game.input.keys['KeyS'] = false;
                         
-                        if (touchStates.left) game.input.keys['KeyA'] = true;
-                        else game.input.keys['KeyA'] = false;
+                        if (touchStates.left) window.game.input.keys['KeyA'] = true;
+                        else window.game.input.keys['KeyA'] = false;
                         
-                        if (touchStates.right) game.input.keys['KeyD'] = true;
-                        else game.input.keys['KeyD'] = false;
+                        if (touchStates.right) window.game.input.keys['KeyD'] = true;
+                        else window.game.input.keys['KeyD'] = false;
                         
-                        if (touchStates.action) game.input.keys['KeyE'] = true;
-                        else game.input.keys['KeyE'] = false;
+                        if (touchStates.action) window.game.input.keys['KeyE'] = true;
+                        else window.game.input.keys['KeyE'] = false;
                     }
                 }, 16);
             }
+            
+            console.log("Game initialization complete");
         }
         
         // Start loading assets
@@ -447,6 +462,29 @@
         setTimeout(assetLoaded, 900); // Simulate models loading
         setTimeout(assetLoaded, 1200); // Simulate textures loading
         setTimeout(assetLoaded, 1500); // Simulate audio loading
+    </script>
+    
+    <!-- Emergency start button fix -->
+    <script>
+        setTimeout(function() {
+            console.log("Setting up emergency button handler");
+            const startBtn = document.getElementById('start-battle-btn');
+            if (startBtn) {
+                startBtn.onclick = function() {
+                    console.log("Direct start button click");
+                    if (window.game) {
+                        const success = window.game.startBattle();
+                        console.log("Start battle result:", success);
+                    } else {
+                        console.error("Game object not found");
+                    }
+                    return false; // Prevent default and stop propagation
+                };
+                console.log("Emergency button handler installed");
+            } else {
+                console.error("Start button not found!");
+            }
+        }, 2000);
     </script>
 </body>
 </html>
