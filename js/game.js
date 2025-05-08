@@ -1,17 +1,20 @@
 // People vs Animal Battle Simulator
-// Main Game Architecture
+// Main Game Implementation
 
-// Core game class structure
 class BattleSimulator {
-  constructor(config) {
+  constructor(options = {}) {
     // Game configuration
-    this.config = config || {
+    this.config = {
       difficulty: 'normal',
       maxFighters: 100,
       animalType: 'gorilla',
       arenaSize: 100, // meters
-      graphicsQuality: 'high'
+      graphicsQuality: 'high',
+      isMobile: options.isMobile || false
     };
+    
+    // Container element
+    this.container = options.container || document.body;
     
     // Game state
     this.state = {
@@ -20,43 +23,45 @@ class BattleSimulator {
       animal: null,
       commander: null,
       time: 0,
-      score: 0
+      score: 0,
+      commanderDamageDealt: 0
     };
     
-    // Systems
-    this.renderer = null;
-    this.scene = null;
-    this.camera = null;
-    this.physics = null;
-    this.input = null;
-    this.ui = null;
-    this.audio = null;
-    
-    // Initialize the game
-    this.init();
-  }
-  
-  init() {
     // Initialize Three.js
     this.initRenderer();
     this.initScene();
     this.initCamera();
     this.initLights();
-    this.initPhysics();
-    this.initInput();
-    this.initUI();
-    this.initAudio();
     
-    // Start game loop
-    this.gameLoop();
+    // Create ground
+    this.createEnvironment();
+    
+    // Initialize systems
+    this.ui = new UIManager(this);
+    this.input = new InputManager(this);
+    this.fighterAI = new FighterAI(this);
+    this.animalAI = new AnimalAI(this);
+    
+    // Set up clock for timing
+    this.clock = new THREE.Clock();
+    
+    // Start in setup phase
+    this.setupBattle();
+    
+    // Start animation loop
+    this.animate();
   }
   
+  // Initialize WebGL renderer
   initRenderer() {
-    // Set up WebGL renderer
-    this.renderer = new THREE.WebGLRenderer({ antialias: true });
+    this.renderer = new THREE.WebGLRenderer({ antialias: !this.config.isMobile });
     this.renderer.setSize(window.innerWidth, window.innerHeight);
+    this.renderer.setPixelRatio(window.devicePixelRatio);
     this.renderer.shadowMap.enabled = true;
-    document.body.appendChild(this.renderer.domElement);
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    
+    // Add to container
+    this.container.appendChild(this.renderer.domElement);
     
     // Handle window resize
     window.addEventListener('resize', () => {
@@ -66,285 +71,463 @@ class BattleSimulator {
     });
   }
   
+  // Initialize scene
   initScene() {
-    // Create scene
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x87ceeb); // Sky blue
-    
-    // Add arena
-    this.createArena();
+    this.scene.background = new THREE.Color(0x87CEEB); // Sky blue
+    this.scene.fog = new THREE.Fog(0x87CEEB, 60, 100);
   }
   
-  createArena() {
-    // Create ground
-    const groundGeometry = new THREE.PlaneGeometry(this.config.arenaSize, this.config.arenaSize);
-    const groundMaterial = new THREE.MeshStandardMaterial({ 
-      color: 0x567d46, // Forest green
-      roughness: 0.8,
-      metalness: 0.2
-    });
-    const ground = new THREE.Mesh(groundGeometry, groundMaterial);
-    ground.rotation.x = -Math.PI / 2;
-    ground.receiveShadow = true;
-    this.scene.add(ground);
-    
-    // Add environment features (trees, rocks, etc)
-    this.addEnvironmentFeatures();
-  }
-  
-  addEnvironmentFeatures() {
-    // Add random trees, rocks, etc.
-    // This will be expanded later
-    const features = 20;
-    for (let i = 0; i < features; i++) {
-      const type = Math.random() > 0.5 ? 'tree' : 'rock';
-      const x = (Math.random() - 0.5) * this.config.arenaSize * 0.9;
-      const z = (Math.random() - 0.5) * this.config.arenaSize * 0.9;
-      
-      if (type === 'tree') {
-        this.createTree(x, z);
-      } else {
-        this.createRock(x, z);
-      }
-    }
-  }
-  
-  createTree(x, z) {
-    // Simple placeholder tree
-    const trunkGeometry = new THREE.CylinderGeometry(0.5, 0.7, 5);
-    const trunkMaterial = new THREE.MeshStandardMaterial({ color: 0x8B4513 });
-    const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
-    
-    const leavesGeometry = new THREE.ConeGeometry(3, 6, 8);
-    const leavesMaterial = new THREE.MeshStandardMaterial({ color: 0x2E8B57 });
-    const leaves = new THREE.Mesh(leavesGeometry, leavesMaterial);
-    leaves.position.y = 5.5;
-    
-    const tree = new THREE.Group();
-    tree.add(trunk);
-    tree.add(leaves);
-    tree.position.set(x, 2.5, z);
-    tree.castShadow = true;
-    
-    this.scene.add(tree);
-  }
-  
-  createRock(x, z) {
-    // Simple placeholder rock
-    const rockGeometry = new THREE.DodecahedronGeometry(Math.random() * 1.5 + 0.5);
-    const rockMaterial = new THREE.MeshStandardMaterial({ 
-      color: 0x808080,
-      roughness: 0.9,
-      metalness: 0.1
-    });
-    const rock = new THREE.Mesh(rockGeometry, rockMaterial);
-    rock.position.set(x, rockGeometry.parameters.radius, z);
-    rock.rotation.set(Math.random(), Math.random(), Math.random());
-    rock.castShadow = true;
-    
-    this.scene.add(rock);
-  }
-  
+  // Initialize camera
   initCamera() {
-    // Setup camera
     this.camera = new THREE.PerspectiveCamera(
-      75, 
+      60, 
       window.innerWidth / window.innerHeight, 
       0.1, 
       1000
     );
+    
+    // Default camera position (overview)
     this.camera.position.set(0, 30, 30);
     this.camera.lookAt(0, 0, 0);
+    
+    // Camera modes
+    this.cameraMode = 'overview'; // 'overview', 'commander', 'animal'
+    
+    // Camera smoothing
+    this.cameraTarget = new THREE.Vector3();
+    this.cameraOffset = new THREE.Vector3(0, 8, 12);
   }
   
+  // Toggle between camera views
+  toggleCameraView() {
+    switch (this.cameraMode) {
+      case 'overview':
+        this.cameraMode = 'commander';
+        break;
+      case 'commander':
+        this.cameraMode = 'animal';
+        break;
+      case 'animal':
+        this.cameraMode = 'overview';
+        break;
+    }
+    
+    // Show camera mode message
+    this.ui.showMessage(`Camera: ${this.cameraMode.toUpperCase()}`);
+  }
+  
+  // Update camera based on current mode
+  updateCamera(delta) {
+    switch (this.cameraMode) {
+      case 'overview':
+        // Smooth transition to overview position
+        this.cameraTarget.set(0, 0, 0);
+        this.cameraOffset.set(0, 30, 30);
+        break;
+        
+      case 'commander':
+        // Follow commander
+        if (this.state.commander) {
+          this.cameraTarget.copy(this.state.commander.position);
+          this.cameraOffset.set(0, 8, 12);
+        }
+        break;
+        
+      case 'animal':
+        // Follow animal
+        if (this.state.animal) {
+          this.cameraTarget.copy(this.state.animal.position);
+          this.cameraOffset.set(0, 10, 15);
+        }
+        break;
+    }
+    
+    // Smoothly interpolate camera position
+    const targetPosition = new THREE.Vector3()
+      .copy(this.cameraTarget)
+      .add(this.cameraOffset);
+    
+    this.camera.position.lerp(targetPosition, 5 * delta);
+    
+    // Look at target
+    const lookPosition = new THREE.Vector3().copy(this.cameraTarget);
+    
+    // Add slight offset to avoid looking exactly at feet
+    if (this.cameraMode === 'commander' || this.cameraMode === 'animal') {
+      lookPosition.y += 1;
+    }
+    
+    this.camera.lookAt(lookPosition);
+  }
+  
+  // Initialize lights
   initLights() {
-    // Add ambient light
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
-    this.scene.add(ambientLight);
+    // Ambient light
+    this.ambientLight = new THREE.AmbientLight(0xCCCCCC, 0.4);
+    this.scene.add(this.ambientLight);
     
-    // Add directional light (sun)
-    const sunLight = new THREE.DirectionalLight(0xffffff, 0.8);
-    sunLight.position.set(50, 50, 50);
-    sunLight.castShadow = true;
-    sunLight.shadow.mapSize.width = 2048;
-    sunLight.shadow.mapSize.height = 2048;
-    sunLight.shadow.camera.near = 1;
-    sunLight.shadow.camera.far = 200;
-    sunLight.shadow.camera.left = -50;
-    sunLight.shadow.camera.right = 50;
-    sunLight.shadow.camera.top = 50;
-    sunLight.shadow.camera.bottom = -50;
-    this.scene.add(sunLight);
+    // Directional light (sun)
+    this.sunLight = new THREE.DirectionalLight(0xFFFFCC, 0.8);
+    this.sunLight.position.set(20, 30, 20);
+    this.sunLight.castShadow = true;
+    
+    // Optimize shadow map settings
+    this.sunLight.shadow.mapSize.width = 2048;
+    this.sunLight.shadow.mapSize.height = 2048;
+    
+    const shadowSize = 40;
+    this.sunLight.shadow.camera.left = -shadowSize;
+    this.sunLight.shadow.camera.right = shadowSize;
+    this.sunLight.shadow.camera.top = shadowSize;
+    this.sunLight.shadow.camera.bottom = -shadowSize;
+    this.sunLight.shadow.camera.near = 1;
+    this.sunLight.shadow.camera.far = 80;
+    
+    this.scene.add(this.sunLight);
+    
+    // Helper for debugging (uncomment if needed)
+    // this.sunLightHelper = new THREE.CameraHelper(this.sunLight.shadow.camera);
+    // this.scene.add(this.sunLightHelper);
   }
   
-  initPhysics() {
-    // Initialize physics system (placeholder for now)
-    // We'll use Ammo.js for final physics implementation
-    this.physics = {
-      update: (delta) => {
-        // Update physics simulation
-      },
-      addBody: (object, config) => {
-        // Add physics body to object
+  // Create environment (ground, terrain features)
+  createEnvironment() {
+    // Ground plane
+    const groundGeometry = new THREE.PlaneGeometry(this.config.arenaSize, this.config.arenaSize, 32, 32);
+    const groundMaterial = new THREE.MeshStandardMaterial({
+      color: 0x4CAF50,
+      roughness: 0.8,
+      metalness: 0.1
+    });
+    
+    this.ground = new THREE.Mesh(groundGeometry, groundMaterial);
+    this.ground.rotation.x = -Math.PI / 2;
+    this.ground.receiveShadow = true;
+    this.ground.userData.isGround = true;
+    this.scene.add(this.ground);
+    
+    // Add terrain features
+    this.addTerrainFeatures();
+  }
+  
+  // Add environmental features
+  addTerrainFeatures() {
+    // Create trees and rocks
+    const numTrees = 30;
+    const numRocks = 15;
+    
+    // Set up obstacle map to prevent overlap
+    this.obstacleMap = new Set();
+    
+    // Create trees
+    for (let i = 0; i < numTrees; i++) {
+      const position = this.getRandomPositionOnGround(3);
+      if (position) {
+        this.createTree(position);
       }
-    };
-  }
-  
-  initInput() {
-    // Input handlers
-    this.input = {
-      keys: {},
-      mouse: {
-        position: new THREE.Vector2(),
-        isDown: false
+    }
+    
+    // Create rocks
+    for (let i = 0; i < numRocks; i++) {
+      const position = this.getRandomPositionOnGround(2);
+      if (position) {
+        this.createRock(position);
       }
-    };
-    
-    // Keyboard input
-    document.addEventListener('keydown', (event) => {
-      this.input.keys[event.code] = true;
-    });
-    
-    document.addEventListener('keyup', (event) => {
-      this.input.keys[event.code] = false;
-    });
-    
-    // Mouse input
-    document.addEventListener('mousemove', (event) => {
-      this.input.mouse.position.x = (event.clientX / window.innerWidth) * 2 - 1;
-      this.input.mouse.position.y = -(event.clientY / window.innerHeight) * 2 + 1;
-    });
-    
-    document.addEventListener('mousedown', () => {
-      this.input.mouse.isDown = true;
-    });
-    
-    document.addEventListener('mouseup', () => {
-      this.input.mouse.isDown = false;
-    });
-    
-    // Touch input for mobile
-    document.addEventListener('touchstart', (event) => {
-      this.input.mouse.isDown = true;
-      const touch = event.touches[0];
-      this.input.mouse.position.x = (touch.clientX / window.innerWidth) * 2 - 1;
-      this.input.mouse.position.y = -(touch.clientY / window.innerHeight) * 2 + 1;
-    });
-    
-    document.addEventListener('touchend', () => {
-      this.input.mouse.isDown = false;
-    });
-    
-    document.addEventListener('touchmove', (event) => {
-      const touch = event.touches[0];
-      this.input.mouse.position.x = (touch.clientX / window.innerWidth) * 2 - 1;
-      this.input.mouse.position.y = -(touch.clientY / window.innerHeight) * 2 + 1;
-    });
+    }
   }
   
-  initUI() {
-    // Initialize UI system
-    this.ui = {
-      updateSetupPhase: () => {
-        // Update UI for setup phase
-      },
-      updateBattlePhase: () => {
-        // Update UI for battle phase
-      },
-      updateResultPhase: () => {
-        // Update UI for result phase
+  // Get random position on ground that doesn't overlap with existing obstacles
+  getRandomPositionOnGround(objectRadius) {
+    const arenaSize = this.config.arenaSize;
+    const centerClearRadius = 20; // Keep center of arena clear
+    
+    // Try up to 10 times to find valid position
+    for (let attempt = 0; attempt < 10; attempt++) {
+      // Generate random position
+      let x, z;
+      
+      // 50% chance to place near edge, 50% chance anywhere
+      if (Math.random() < 0.5) {
+        // Near edge
+        const edgeDistance = 5 + Math.random() * 15;
+        const side = Math.floor(Math.random() * 4);
+        
+        switch (side) {
+          case 0: // North
+            x = (Math.random() - 0.5) * (arenaSize - 2 * objectRadius);
+            z = -arenaSize / 2 + edgeDistance;
+            break;
+          case 1: // East
+            x = arenaSize / 2 - edgeDistance;
+            z = (Math.random() - 0.5) * (arenaSize - 2 * objectRadius);
+            break;
+          case 2: // South
+            x = (Math.random() - 0.5) * (arenaSize - 2 * objectRadius);
+            z = arenaSize / 2 - edgeDistance;
+            break;
+          case 3: // West
+            x = -arenaSize / 2 + edgeDistance;
+            z = (Math.random() - 0.5) * (arenaSize - 2 * objectRadius);
+            break;
+        }
+      } else {
+        // Anywhere (except center)
+        const angle = Math.random() * Math.PI * 2;
+        const distance = centerClearRadius + Math.random() * (arenaSize / 2 - centerClearRadius - objectRadius);
+        
+        x = Math.cos(angle) * distance;
+        z = Math.sin(angle) * distance;
       }
-    };
-  }
-  
-  initAudio() {
-    // Initialize audio system
-    this.audio = {
-      playSound: (soundId) => {
-        // Play sound effect
-      },
-      playMusic: (trackId) => {
-        // Play background music
+      
+      // Check if position is valid (not overlapping other obstacles)
+      const posKey = `${Math.round(x)},${Math.round(z)}`;
+      
+      if (!this.obstacleMap.has(posKey)) {
+        // Mark this area as occupied (approximate grid-based collision)
+        for (let ox = -Math.ceil(objectRadius); ox <= Math.ceil(objectRadius); ox++) {
+          for (let oz = -Math.ceil(objectRadius); oz <= Math.ceil(objectRadius); oz++) {
+            this.obstacleMap.add(`${Math.round(x + ox)},${Math.round(z + oz)}`);
+          }
+        }
+        
+        return new THREE.Vector3(x, 0, z);
       }
-    };
+    }
+    
+    // Couldn't find valid position
+    return null;
   }
   
+  // Create tree at position
+  createTree(position) {
+    // Tree types (simple, medium, tall)
+    const treeTypes = [
+      { trunkHeight: 3, trunkRadius: 0.3, crownHeight: 4, crownRadius: 2, crownSegments: 8 },
+      { trunkHeight: 5, trunkRadius: 0.4, crownHeight: 6, crownRadius: 3, crownSegments: 8 },
+      { trunkHeight: 7, trunkRadius: 0.5, crownHeight: 8, crownRadius: 4, crownSegments: 10 }
+    ];
+    
+    // Randomly select tree type
+    const treeType = treeTypes[Math.floor(Math.random() * treeTypes.length)];
+    
+    // Create trunk
+    const trunkGeometry = new THREE.CylinderGeometry(
+      treeType.trunkRadius * 0.7, // Top radius
+      treeType.trunkRadius, // Bottom radius
+      treeType.trunkHeight,
+      8
+    );
+    
+    const trunkMaterial = new THREE.MeshStandardMaterial({
+      color: 0x8B4513, // Brown
+      roughness: 0.9,
+      metalness: 0.1
+    });
+    
+    const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
+    trunk.position.y = treeType.trunkHeight / 2;
+    trunk.castShadow = true;
+    trunk.receiveShadow = true;
+    
+    // Create crown
+    const crownGeometry = new THREE.ConeGeometry(
+      treeType.crownRadius,
+      treeType.crownHeight,
+      treeType.crownSegments
+    );
+    
+    const crownMaterial = new THREE.MeshStandardMaterial({
+      color: 0x2E8B57, // Green
+      roughness: 0.8,
+      metalness: 0.1
+    });
+    
+    const crown = new THREE.Mesh(crownGeometry, crownMaterial);
+    crown.position.y = treeType.trunkHeight + treeType.crownHeight / 2 - 0.5;
+    crown.castShadow = true;
+    crown.receiveShadow = true;
+    
+    // Create tree group
+    const tree = new THREE.Group();
+    tree.add(trunk);
+    tree.add(crown);
+    tree.position.copy(position);
+    
+    // Slightly random rotation
+    tree.rotation.y = Math.random() * Math.PI * 2;
+    
+    // Add to scene
+    tree.userData.isObstacle = true;
+    tree.userData.obstacleRadius = treeType.crownRadius;
+    this.scene.add(tree);
+  }
+  
+  // Create rock at position
+  createRock(position) {
+    // Rock variations
+    const rockSize = 0.5 + Math.random() * 2;
+    const rockGeometry = new THREE.DodecahedronGeometry(rockSize, 1);
+    
+    // Distort rock vertices for more natural shape
+    const vertices = rockGeometry.attributes.position;
+    for (let i = 0; i < vertices.count; i++) {
+      const x = vertices.getX(i);
+      const y = vertices.getY(i);
+      const z = vertices.getZ(i);
+      
+      // Add random variation to each vertex
+      vertices.setX(i, x * (1 + Math.random() * 0.2 - 0.1));
+      vertices.setY(i, y * (1 + Math.random() * 0.2 - 0.1));
+      vertices.setZ(i, z * (1 + Math.random() * 0.2 - 0.1));
+    }
+    
+    // Update geometry
+    rockGeometry.computeVertexNormals();
+    
+    // Create rock material
+    const rockMaterial = new THREE.MeshStandardMaterial({
+      color: 0x808080, // Gray
+      roughness: 0.9,
+      metalness: 0.1
+    });
+    
+    // Create rock mesh
+    const rock = new THREE.Mesh(rockGeometry, rockMaterial);
+    rock.position.copy(position);
+    rock.position.y = rockSize / 2;
+    rock.rotation.set(Math.random(), Math.random(), Math.random());
+    rock.castShadow = true;
+    rock.receiveShadow = true;
+    
+    // Add to scene
+    rock.userData.isObstacle = true;
+    rock.userData.obstacleRadius = rockSize;
+    this.scene.add(rock);
+  }
+  
+  // Create a new fighter
+  createFighter(position) {
+    // Check if we've reached the maximum number of fighters
+    if (this.state.fighters.length >= this.config.maxFighters) {
+      return null;
+    }
+    
+    // Create fighter mesh
+    const fighterGeometry = new THREE.BoxGeometry(0.7, 1.8, 0.7);
+    const fighterMaterial = new THREE.MeshStandardMaterial({
+      color: 0x2196F3, // Blue
+      roughness: 0.7,
+      metalness: 0.2
+    });
+    
+    const fighterMesh = new THREE.Mesh(fighterGeometry, fighterMaterial);
+    fighterMesh.position.copy(position);
+    fighterMesh.position.y = 0.9; // Half height
+    fighterMesh.castShadow = true;
+    fighterMesh.receiveShadow = true;
+    
+    // Create fighter object
+    const fighter = {
+      mesh: fighterMesh,
+      position: position.clone(),
+      velocity: new THREE.Vector3(),
+      forceAccumulator: new THREE.Vector3(),
+      rotation: 0,
+      health: 50,
+      maxHealth: 50,
+      state: 'idle', // 'idle', 'moving', 'attacking', 'fleeing', 'dead'
+      target: null,
+      attackPower: 1,
+      lastAttackTime: 0,
+      attackCooldown: 1,
+      commanderInfluence: false,
+      stunned: false,
+      stunTime: 0,
+      index: this.state.fighters.length // Assign unique index
+    };
+    
+    // Add to game state and scene
+    this.state.fighters.push(fighter);
+    this.scene.add(fighterMesh);
+    
+    // Update UI
+    this.ui.updateSetupUI();
+    
+    return fighter;
+  }
+  
+  // Create commander (player-controlled)
   createCommander() {
-    // Create player-controlled commander character
-    const geometry = new THREE.BoxGeometry(1, 2, 1);
-    const material = new THREE.MeshStandardMaterial({ color: 0xff0000 });
-    const commanderMesh = new THREE.Mesh(geometry, material);
-    commanderMesh.position.y = 1;
-    commanderMesh.castShadow = true;
+    // Create commander mesh
+    const commanderGeometry = new THREE.BoxGeometry(1, 2, 1);
+    const commanderMaterial = new THREE.MeshStandardMaterial({
+      color: 0xF44336, // Red
+      roughness: 0.7,
+      metalness: 0.3
+    });
     
+    const commanderMesh = new THREE.Mesh(commanderGeometry, commanderMaterial);
+    commanderMesh.position.set(0, 1, 0);
+    commanderMesh.castShadow = true;
+    commanderMesh.receiveShadow = true;
+    
+    // Create commander object
     this.state.commander = {
       mesh: commanderMesh,
       position: new THREE.Vector3(0, 1, 0),
       velocity: new THREE.Vector3(),
       rotation: 0,
-      health: 100,
-      stamina: 100,
-      controlledFighters: []
+      health: 200,
+      maxHealth: 200,
+      attackPower: 5,
+      lastAttackTime: 0,
+      attackCooldown: 0.5,
+      attackRange: 2
     };
     
+    // Add to scene
     this.scene.add(commanderMesh);
   }
   
-  createFighter(position) {
-    // Create AI-controlled fighter
-    const geometry = new THREE.BoxGeometry(0.7, 1.8, 0.7);
-    const material = new THREE.MeshStandardMaterial({ color: 0x0000ff });
-    const fighterMesh = new THREE.Mesh(geometry, material);
-    fighterMesh.position.copy(position);
-    fighterMesh.position.y = 0.9; // Half height
-    fighterMesh.castShadow = true;
-    
-    const fighter = {
-      mesh: fighterMesh,
-      position: position.clone(),
-      velocity: new THREE.Vector3(),
-      rotation: 0,
-      health: 50,
-      state: 'idle', // 'idle', 'moving', 'attacking', 'fleeing', 'dead'
-      target: null,
-      commanderInfluence: false
-    };
-    
-    this.state.fighters.push(fighter);
-    this.scene.add(fighterMesh);
-    
-    return fighter;
-  }
-  
+  // Create animal based on config
   createAnimal() {
-    // Create animal based on config
-    const geometry = new THREE.BoxGeometry(3, 2.5, 5);
-    const material = new THREE.MeshStandardMaterial({ color: 0x8B4513 });
-    const animalMesh = new THREE.Mesh(geometry, material);
-    animalMesh.position.set(0, 1.25, -30); // Start at one end of the arena
-    animalMesh.castShadow = true;
-    
-    this.state.animal = {
-      type: this.config.animalType,
-      mesh: animalMesh,
-      position: animalMesh.position.clone(),
-      velocity: new THREE.Vector3(),
-      rotation: 0,
-      health: 1000, // Animal has high health
-      attackPower: 25,
-      attackRange: 2,
-      state: 'idle', // 'idle', 'charging', 'attacking', 'stunned'
-      target: null,
-      lastAttackTime: 0,
-      attackCooldown: 1
-    };
-    
-    this.scene.add(animalMesh);
+    return this.animalAI.createAnimal(this.config.animalType);
   }
   
+  // Place fighter at position
+  placeFighter(position) {
+    // Only allow in setup phase
+    if (this.state.phase !== 'setup') return false;
+    
+    // Clone position to avoid reference issues
+    const pos = position.clone();
+    
+    // Create fighter
+    return this.createFighter(pos);
+  }
+  
+  // Clear all fighters
+  clearFighters() {
+    // Remove all fighters from scene
+    for (const fighter of this.state.fighters) {
+      this.scene.remove(fighter.mesh);
+    }
+    
+    // Clear fighters array
+    this.state.fighters = [];
+    
+    // Update UI
+    this.ui.updateSetupUI();
+  }
+  
+  // Setup battle (start or restart)
   setupBattle() {
-    // Clear any existing battle elements
+    // Clear any existing entities
     this.clearBattle();
+    
+    // Switch to setup phase
+    this.state.phase = 'setup';
     
     // Create animal
     this.createAnimal();
@@ -352,11 +535,73 @@ class BattleSimulator {
     // Create commander
     this.createCommander();
     
-    // Switch to setup phase
-    this.state.phase = 'setup';
-    this.ui.updateSetupPhase();
+    // Show setup UI
+    this.ui.showSetupUI();
   }
   
+  // Start battle
+  startBattle() {
+    // Only start if we have fighters
+    if (this.state.phase !== 'setup' || this.state.fighters.length === 0) {
+      return false;
+    }
+    
+    // Reset time and score
+    this.state.time = 0;
+    this.state.score = 0;
+    this.state.commanderDamageDealt = 0;
+    
+    // Switch to battle phase
+    this.state.phase = 'battle';
+    
+    // Show battle UI
+    this.ui.showBattleUI();
+    
+    // Show tutorial messages
+    if (this.config.isMobile) {
+      this.ui.showTutorialTip('Use the on-screen controls to move your commander. Double-tap to rally nearby fighters.', { x: window.innerWidth / 2, y: window.innerHeight / 2 }, 8000);
+    } else {
+      this.ui.showTutorialTip('Use WASD to move, mouse to aim and attack, E to rally nearby fighters, F to change formation.', { x: window.innerWidth / 2, y: window.innerHeight / 2 }, 8000);
+    }
+    
+    return true;
+  }
+  
+  // End battle with result
+  endBattle(playerWins) {
+    // Switch to result phase
+    this.state.phase = 'result';
+    
+    // Calculate final score
+    if (playerWins) {
+      // Base score
+      this.state.score = 1000;
+      
+      // Bonus for remaining fighters
+      const aliveFighters = this.state.fighters.filter(f => f.state !== 'dead').length;
+      this.state.score += aliveFighters * 100;
+      
+      // Time bonus (faster = better)
+      const timeBonus = Math.max(0, 300 - this.state.time) * 10;
+      this.state.score += timeBonus;
+    } else {
+      // Partial score for damage done to animal
+      const damagePercent = 1 - (this.state.animal.health / this.state.animal.maxHealth);
+      this.state.score = Math.floor(damagePercent * 500);
+    }
+    
+    // Show result UI
+    this.ui.showResultUI();
+    
+    // Show victory/defeat message
+    if (playerWins) {
+      this.ui.showMessage('VICTORY!', 3000);
+    } else {
+      this.ui.showMessage('DEFEAT', 3000);
+    }
+  }
+  
+  // Clear battle (remove all entities)
   clearBattle() {
     // Remove fighters
     for (const fighter of this.state.fighters) {
@@ -377,309 +622,267 @@ class BattleSimulator {
     }
   }
   
-  placeFighter(position) {
-    // Place a fighter at the clicked position during setup phase
-    if (this.state.phase === 'setup' && this.state.fighters.length < this.config.maxFighters) {
-      this.createFighter(position);
-      return true;
-    }
-    return false;
-  }
-  
-  startBattle() {
-    // Transition from setup to battle phase
-    if (this.state.phase === 'setup' && this.state.fighters.length > 0) {
-      this.state.phase = 'battle';
-      this.state.time = 0;
-      this.ui.updateBattlePhase();
-      return true;
-    }
-    return false;
-  }
-  
+  // Main update method
   update(delta) {
-    // Update game based on current phase
-    if (this.state.phase === 'setup') {
-      this.updateSetupPhase(delta);
-    } else if (this.state.phase === 'battle') {
-      this.updateBattlePhase(delta);
-    } else if (this.state.phase === 'result') {
-      this.updateResultPhase(delta);
+    // Update camera
+    this.updateCamera(delta);
+    
+    // Update based on current phase
+    switch (this.state.phase) {
+      case 'setup':
+        this.updateSetupPhase(delta);
+        break;
+      case 'battle':
+        this.updateBattlePhase(delta);
+        break;
+      case 'result':
+        this.updateResultPhase(delta);
+        break;
     }
     
-    // Update physics
-    this.physics.update(delta);
+    // Update input
+    this.input.update(delta);
   }
   
+  // Update setup phase
   updateSetupPhase(delta) {
-    // Handle fighter placement
-    if (this.input.mouse.isDown) {
-      // Cast ray to find placement position
-      const raycaster = new THREE.Raycaster();
-      raycaster.setFromCamera(this.input.mouse.position, this.camera);
-      
-      // Find intersections with ground
-      const ground = this.scene.children.find(child => child instanceof THREE.Mesh && 
-                                            child.geometry instanceof THREE.PlaneGeometry);
-      
-      if (ground) {
-        const intersects = raycaster.intersectObject(ground);
-        if (intersects.length > 0) {
-          this.placeFighter(intersects[0].point);
-        }
-      }
+    // Handle fighter placement in InputManager
+    
+    // Rotate animal and commander slowly
+    if (this.state.animal) {
+      this.state.animal.rotation += 0.5 * delta;
+      this.state.animal.mesh.rotation.y = this.state.animal.rotation;
     }
     
-    // Check for battle start
-    if (this.input.keys['Space']) {
-      this.startBattle();
+    if (this.state.commander) {
+      this.state.commander.rotation += 0.5 * delta;
+      this.state.commander.mesh.rotation.y = this.state.commander.rotation;
     }
+    
+    // Check for battle start from input manager
   }
   
+  // Update battle phase
   updateBattlePhase(delta) {
     // Update time
     this.state.time += delta;
     
+    // Update UI
+    this.ui.updateBattleUI();
+    
     // Update commander
     this.updateCommander(delta);
     
-    // Update fighters
-    for (const fighter of this.state.fighters) {
-      this.updateFighter(fighter, delta);
-    }
+    // Update fighter AI
+    this.fighterAI.update(delta);
     
-    // Update animal
-    this.updateAnimal(delta);
+    // Update animal AI
+    this.animalAI.update(delta);
     
     // Check win/lose conditions
     this.checkBattleEnd();
   }
   
+  // Update result phase
+  updateResultPhase(delta) {
+    // Most functionality handled by UI
+  }
+  
+  // Update commander based on input
   updateCommander(delta) {
     if (!this.state.commander) return;
     
-    // Process movement input
-    const moveSpeed = 10;
     const commander = this.state.commander;
+    
+    // Process movement input
+    const moveSpeed = 15 * delta;
     
     // Reset velocity
     commander.velocity.set(0, 0, 0);
     
+    // Movement direction based on camera orientation
+    const forward = new THREE.Vector3(0, 0, -1).applyAxisAngle(new THREE.Vector3(0, 1, 0), this.camera.rotation.y);
+    const right = new THREE.Vector3(1, 0, 0).applyAxisAngle(new THREE.Vector3(0, 1, 0), this.camera.rotation.y);
+    
     // Forward/backward
     if (this.input.keys['KeyW']) {
-      commander.velocity.z = -moveSpeed * delta;
+      commander.velocity.add(forward.clone().multiplyScalar(moveSpeed));
     } else if (this.input.keys['KeyS']) {
-      commander.velocity.z = moveSpeed * delta;
+      commander.velocity.add(forward.clone().multiplyScalar(-moveSpeed));
     }
     
     // Left/right
     if (this.input.keys['KeyA']) {
-      commander.velocity.x = -moveSpeed * delta;
+      commander.velocity.add(right.clone().multiplyScalar(-moveSpeed));
     } else if (this.input.keys['KeyD']) {
-      commander.velocity.x = moveSpeed * delta;
+      commander.velocity.add(right.clone().multiplyScalar(moveSpeed));
     }
     
     // Update position
     commander.position.add(commander.velocity);
+    
+    // Update rotation to face movement direction
+    if (commander.velocity.lengthSq() > 0.001) {
+      const targetRotation = Math.atan2(commander.velocity.x, commander.velocity.z);
+      
+      // Smooth rotation
+      commander.rotation = this.lerpAngle(commander.rotation, targetRotation, 10 * delta);
+    }
+    
+    // Update mesh position and rotation
     commander.mesh.position.copy(commander.position);
+    commander.mesh.rotation.y = commander.rotation;
     
-    // Handle commander abilities
+    // Handle rally command (E key)
     if (this.input.keys['KeyE']) {
-      // Rally nearby fighters (influence)
-      const influenceRadius = 10;
-      for (const fighter of this.state.fighters) {
-        if (fighter.state !== 'dead') {
-          const distance = commander.position.distanceTo(fighter.position);
-          if (distance < influenceRadius) {
-            fighter.commanderInfluence = true;
-          }
-        }
-      }
+      this.rallyNearbyFighters();
     }
     
-    // Attack
+    // Handle commander attack
     if (this.input.mouse.isDown) {
-      // Attack logic
+      this.commanderAttack();
     }
+    
+    // Check arena boundaries
+    this.keepInArena(commander);
   }
   
-  updateFighter(fighter, delta) {
-    if (fighter.state === 'dead') return;
+  // Rally nearby fighters
+  rallyNearbyFighters() {
+    if (!this.state.commander) return;
     
-    // Basic AI behavior
-    const animal = this.state.animal;
-    const distanceToAnimal = fighter.position.distanceTo(animal.position);
+    const influenceRadius = 15;
     
-    // Decision making
-    if (fighter.commanderInfluence) {
-      // Follow commander's influence
-      fighter.state = 'attacking';
-      fighter.target = animal;
-      fighter.commanderInfluence = false; // Reset influence
-    } else if (fighter.health < 20) {
-      // Low health, try to flee
-      fighter.state = 'fleeing';
-    } else if (distanceToAnimal < 5) {
-      // Animal is close, attack
-      fighter.state = 'attacking';
-      fighter.target = animal;
-    } else {
-      // Move toward animal
-      fighter.state = 'moving';
-      fighter.target = animal;
-    }
-    
-    // Execute current state
-    switch (fighter.state) {
-      case 'idle':
-        // Do nothing
-        break;
-      
-      case 'moving':
-        // Move toward target
-        if (fighter.target) {
-          const direction = new THREE.Vector3()
-            .subVectors(fighter.target.position, fighter.position)
-            .normalize();
-          
-          fighter.velocity = direction.multiplyScalar(5 * delta);
-          fighter.position.add(fighter.velocity);
-        }
-        break;
-      
-      case 'attacking':
-        // Move toward target if too far
-        if (fighter.target && distanceToAnimal > 2) {
-          const direction = new THREE.Vector3()
-            .subVectors(fighter.target.position, fighter.position)
-            .normalize();
-          
-          fighter.velocity = direction.multiplyScalar(5 * delta);
-          fighter.position.add(fighter.velocity);
-        } 
-        // Attack if close enough
-        else if (fighter.target && distanceToAnimal <= 2) {
-          // Deal damage to animal
-          animal.health -= 1;
-        }
-        break;
-      
-      case 'fleeing':
-        // Run away from animal
-        if (animal) {
-          const direction = new THREE.Vector3()
-            .subVectors(fighter.position, animal.position)
-            .normalize();
-          
-          fighter.velocity = direction.multiplyScalar(7 * delta); // Flee faster
-          fighter.position.add(fighter.velocity);
-        }
-        break;
-    }
-    
-    // Update mesh position
-    fighter.mesh.position.copy(fighter.position);
-  }
-  
-  updateAnimal(delta) {
-    if (!this.state.animal) return;
-    
-    const animal = this.state.animal;
-    
-    // Find closest fighter or commander
-    let closestTarget = null;
-    let closestDistance = Infinity;
-    
-    // Check fighters
+    // Affect all fighters within radius
     for (const fighter of this.state.fighters) {
-      if (fighter.state !== 'dead') {
-        const distance = animal.position.distanceTo(fighter.position);
-        if (distance < closestDistance) {
-          closestDistance = distance;
-          closestTarget = fighter;
-        }
+      if (fighter.state === 'dead') continue;
+      
+      const distance = this.state.commander.position.distanceTo(fighter.position);
+      
+      if (distance <= influenceRadius) {
+        fighter.commanderInfluence = true;
       }
     }
     
-    // Check commander
-    if (this.state.commander) {
-      const distance = animal.position.distanceTo(this.state.commander.position);
-      if (distance < closestDistance) {
-        closestDistance = distance;
-        closestTarget = this.state.commander;
-      }
-    }
-    
-    animal.target = closestTarget;
-    
-    // Animal behavior based on state
-    switch (animal.state) {
-      case 'idle':
-        // If there's a target, start charging
-        if (animal.target) {
-          animal.state = 'charging';
-        }
-        break;
-      
-      case 'charging':
-        // Move toward target
-        if (animal.target) {
-          const direction = new THREE.Vector3()
-            .subVectors(animal.target.position, animal.position)
-            .normalize();
-          
-          animal.velocity = direction.multiplyScalar(8 * delta); // Animal is fast
-          animal.position.add(animal.velocity);
-          
-          // If close enough to attack
-          if (animal.position.distanceTo(animal.target.position) < animal.attackRange) {
-            animal.state = 'attacking';
-          }
-        } else {
-          animal.state = 'idle';
-        }
-        break;
-      
-      case 'attacking':
-        // Attack logic
-        if (animal.target && this.state.time - animal.lastAttackTime > animal.attackCooldown) {
-          // Deal damage to target
-          if (animal.target === this.state.commander) {
-            this.state.commander.health -= animal.attackPower;
-          } else {
-            animal.target.health -= animal.attackPower;
-            
-            // Check if fighter died
-            if (animal.target.health <= 0) {
-              animal.target.state = 'dead';
-              animal.target.mesh.material.color.set(0x555555); // Gray out dead fighters
-            }
-          }
-          
-          animal.lastAttackTime = this.state.time;
-          
-          // Return to charging to find next target
-          animal.state = 'charging';
-        }
-        break;
-      
-      case 'stunned':
-        // Cannot move for a while
-        animal.stunTime -= delta;
-        if (animal.stunTime <= 0) {
-          animal.state = 'charging';
-        }
-        break;
-    }
-    
-    // Update mesh position
-    animal.mesh.position.copy(animal.position);
+    // Visual effect
+    this.createRallyEffect(this.state.commander.position, influenceRadius);
   }
   
+  // Create visual effect for rally
+  createRallyEffect(position, radius) {
+    // Create circle geometry
+    const geometry = new THREE.RingGeometry(radius - 0.5, radius, 32);
+    const material = new THREE.MeshBasicMaterial({
+      color: 0x4CAF50,
+      transparent: true,
+      opacity: 0.5,
+      side: THREE.DoubleSide
+    });
+    
+    const ring = new THREE.Mesh(geometry, material);
+    ring.rotation.x = Math.PI / 2;
+    ring.position.copy(position);
+    ring.position.y = 0.1;
+    this.scene.add(ring);
+    
+    // Fade out and remove
+    const startTime = this.clock.elapsedTime;
+    
+    const animateRing = () => {
+      const elapsedTime = this.clock.elapsedTime - startTime;
+      
+      if (elapsedTime < 1) {
+        // Scale up and fade out
+        const scale = 1 + elapsedTime * 0.5;
+        ring.scale.set(scale, scale, scale);
+        ring.material.opacity = 0.5 * (1 - elapsedTime);
+        
+        requestAnimationFrame(animateRing);
+      } else {
+        // Remove from scene
+        this.scene.remove(ring);
+        ring.geometry.dispose();
+        ring.material.dispose();
+      }
+    };
+    
+    animateRing();
+  }
+  
+  // Commander attack
+  commanderAttack() {
+    if (!this.state.commander || !this.state.animal) return;
+    
+    const commander = this.state.commander;
+    
+    // Check attack cooldown
+    if (this.state.time - commander.lastAttackTime < commander.attackCooldown) {
+      return;
+    }
+    
+    // Check if animal is in range
+    const distanceToAnimal = commander.position.distanceTo(this.state.animal.position);
+    
+    if (distanceToAnimal <= commander.attackRange) {
+      // Deal damage to animal
+      const damage = commander.attackPower;
+      this.state.animal.health -= damage;
+      
+      // Record damage for achievements
+      this.state.commanderDamageDealt += damage;
+      
+      // Record damage for rage mechanics
+      this.animalAI.recordDamageToAnimal(damage);
+      
+      // Reset attack timer
+      commander.lastAttackTime = this.state.time;
+      
+      // Play attack effect
+      this.createAttackEffect(commander.position, this.state.animal.position);
+    }
+  }
+  
+  // Create attack effect
+  createAttackEffect(start, end) {
+    // Create line geometry
+    const points = [
+      start.clone().add(new THREE.Vector3(0, 1, 0)),
+      end.clone().add(new THREE.Vector3(0, 1, 0))
+    ];
+    
+    const geometry = new THREE.BufferGeometry().setFromPoints(points);
+    const material = new THREE.LineBasicMaterial({
+      color: 0xFF5722,
+      linewidth: 3
+    });
+    
+    const line = new THREE.Line(geometry, material);
+    this.scene.add(line);
+    
+    // Remove after short delay
+    setTimeout(() => {
+      this.scene.remove(line);
+      geometry.dispose();
+      material.dispose();
+    }, 100);
+  }
+  
+  // Keep entity within arena boundaries
+  keepInArena(entity) {
+    const maxX = this.config.arenaSize / 2 - 2;
+    const maxZ = this.config.arenaSize / 2 - 2;
+    
+    // Clamp position to arena bounds
+    entity.position.x = Math.max(-maxX, Math.min(maxX, entity.position.x));
+    entity.position.z = Math.max(-maxZ, Math.min(maxZ, entity.position.z));
+  }
+  
+  // Check for end of battle conditions
   checkBattleEnd() {
     // Check if animal is defeated
     if (this.state.animal && this.state.animal.health <= 0) {
       this.endBattle(true); // Player wins
+      return;
     }
     
     // Check if all fighters and commander are defeated
@@ -691,58 +894,23 @@ class BattleSimulator {
     }
   }
   
-  endBattle(playerWins) {
-    this.state.phase = 'result';
-    
-    // Calculate score
-    if (playerWins) {
-      // Base score
-      this.state.score = 1000;
-      
-      // Bonus for remaining fighters
-      const aliveFighters = this.state.fighters.filter(fighter => fighter.state !== 'dead').length;
-      this.state.score += aliveFighters * 100;
-      
-      // Time bonus (faster = better)
-      const timeBonus = Math.max(0, 300 - this.state.time) * 10;
-      this.state.score += timeBonus;
-    } else {
-      // Partial score for damage done to animal
-      const damagePercent = 1 - (this.state.animal.health / 1000);
-      this.state.score = Math.floor(damagePercent * 500);
-    }
-    
-    this.ui.updateResultPhase();
+  // Utility: Lerp angle
+  lerpAngle(a, b, t) {
+    const delta = ((b - a + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
+    return a + delta * Math.min(1, t);
   }
   
-  updateResultPhase(delta) {
-    // Handle end of battle UI and transitions
-    if (this.input.keys['KeyR']) {
-      this.setupBattle(); // Restart battle
-    }
-  }
-  
-  gameLoop() {
-    const clock = new THREE.Clock();
+  // Animation loop
+  animate() {
+    requestAnimationFrame(() => this.animate());
     
-    const animate = () => {
-      requestAnimationFrame(animate);
-      
-      const delta = clock.getDelta();
-      this.update(delta);
-      
-      this.renderer.render(this.scene, this.camera);
-    };
+    // Get delta time
+    const delta = this.clock.getDelta();
     
-    animate();
+    // Update game
+    this.update(delta);
+    
+    // Render scene
+    this.renderer.render(this.scene, this.camera);
   }
 }
-
-// Main entry point
-window.addEventListener('DOMContentLoaded', () => {
-  // Create and start the game
-  const game = new BattleSimulator();
-  
-  // For development purposes, expose game to window
-  window.game = game;
-});
