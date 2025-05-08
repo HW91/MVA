@@ -200,7 +200,7 @@
             bottom: 100px;
             left: 50%;
             transform: translateX(-50%);
-            display: none;
+            display: none !important; /* Force hide initially */
             z-index: 20;
         }
         
@@ -388,7 +388,11 @@
         
         // Detect mobile devices
         function isMobileDevice() {
-            return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            // For testing - disable mobile detection
+            return false;
+            
+            // Normal detection (uncomment later)
+            // return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
         }
         
         // Initialize game
@@ -410,12 +414,17 @@
             const startBattleBtn = document.getElementById('start-battle-btn');
             if (startBattleBtn) {
                 startBattleBtn.onclick = function(e) {
-                    e.preventDefault();
-                    e.stopPropagation();
                     console.log("Start button direct click");
                     if (window.game) {
                         const result = window.game.startBattle();
                         console.log("Battle start result:", result);
+                        
+                        // Only show mobile controls during battle phase
+                        const mobileControls = document.getElementById('mobile-controls');
+                        if (result && isMobileDevice()) {
+                            mobileControls.style.display = 'block';
+                        }
+                        
                         // Alert for visual feedback
                         if (!result) {
                             alert("Could not start battle. Check console for details.");
@@ -438,6 +447,9 @@
             document.getElementById('restart-btn').onclick = function() {
                 console.log("Restart button clicked");
                 window.game.setupBattle();
+                
+                // Hide mobile controls when going back to setup
+                document.getElementById('mobile-controls').style.display = 'none';
             };
             
             document.getElementById('share-btn').onclick = function() {
@@ -485,7 +497,7 @@
             
             // Setup mobile controls if needed
             if (isMobileDevice()) {
-                document.getElementById('mobile-controls').style.display = 'block';
+                // Controls are hidden initially and only shown during battle
                 
                 // Touch controls
                 const touchControls = {
@@ -531,18 +543,4 @@
                         else window.game.input.keys['KeyA'] = false;
                         
                         if (touchStates.right) window.game.input.keys['KeyD'] = true;
-                        else window.game.input.keys['KeyD'] = false;
-                        
-                        if (touchStates.action) window.game.input.keys['KeyE'] = true;
-                        else window.game.input.keys['KeyE'] = false;
-                    }
-                }, 16);
-            }
-            
-            // Add click debug on document
-            if (DEBUG) {
-                document.addEventListener('click', function(e) {
-                    console.log("Click at:", e.clientX, e.clientY);
-                    console.log("Clicked element:", e.target);
-                    
-                    // Flash p
+          
