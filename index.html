@@ -1,282 +1,1551 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>People vs Animal Battle Simulator</title>
-  <style>
-    body { margin:0; padding:0; overflow:hidden; background:#000; font-family:Arial,sans-serif; }
-    #game-container { position:absolute; width:100%; height:100%; z-index:1; }
-    #loading-screen { position:absolute; width:100%; height:100%; background:#000; color:#fff;
-      display:flex; flex-direction:column; justify-content:center; align-items:center; z-index:1000; }
-    #loading-screen.hidden { display:none !important; }
-    #loading-bar-container { width:80%; max-width:400px; height:20px; background:#333;
-      border-radius:10px; margin-top:20px; }
-    #loading-bar { width:0%; height:100%; background:#4CAF50; border-radius:10px; transition:width .3s; }
-    #ui-container { position:absolute; width:100%; height:100%; pointer-events:none; z-index:10; }
-    .ui-panel { pointer-events:auto; }
-    #setup-ui, #battle-ui, #result-ui, #formation-menu, #mobile-controls { display:none; z-index:20; }
-    /* (Include your existing CSS for #setup-ui, #battle-ui, #result-ui, buttons, health bars, etc.) */
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>People vs Animal Battle</title>
+    <style>
+        body { 
+            margin: 0; 
+            padding: 0; 
+            background: #000; 
+            overflow: hidden; 
+            font-family: Arial, sans-serif;
+            color: white;
+        }
+        #game-container {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+        }
+        #ui-overlay {
+            position: absolute;
+            bottom: 20px;
+            left: 0;
+            width: 100%;
+            text-align: center;
+            z-index: 100;
+            pointer-events: none;
+        }
+        .btn {
+            display: inline-block;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 18px;
+            border-radius: 5px;
+            cursor: pointer;
+            pointer-events: auto;
+            margin: 0 10px;
+        }
+        .btn-secondary {
+            background: #666;
+        }
+        #fighter-counter {
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 10px;
+            display: inline-block;
+            pointer-events: auto;
+        }
+        #battle-ui {
+            display: none;
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0,0,0,0.7);
+            padding: 10px;
+            border-radius: 5px;
+            z-index: 100;
+        }
+        #result-ui {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.7);
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            z-index: 100;
+        }
+        .health-bar-container {
+            width: 200px;
+            height: 15px;
+            background: #333;
+            border-radius: 7px;
+            margin-top: 5px;
+            overflow: hidden;
+        }
+        .health-bar {
+            height: 100%;
+            border-radius: 7px;
+            transition: width 0.3s;
+        }
+        .animal-health {
+            background: #f44336;
+            width: 100%;
+        }
+        .commander-health {
+            background: #2196F3;
+            width: 100%;
+        }
+        #formation-menu {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(0,0,0,0.7);
+            padding: 10px;
+            border-radius: 5px;
+            display: none;
+            z-index: 100;
+        }
+        .formation-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: 2px solid white;
+            background: rgba(255,255,255,0.2);
+            color: white;
+            font-size: 16px;
+            margin: 5px;
+            cursor: pointer;
+            display: inline-block;
+        }
+        .formation-btn.active {
+            background: rgba(76,175,80,0.5);
+        }
+        #debug-overlay {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 12px;
+            z-index: 1000;
+        }
+        #controls-hint {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 14px;
+            display: none;
+            max-width: 250px;
+            z-index: 100;
+        }
+        #animal-select {
+            padding: 5px;
+            border-radius: 5px;
+            margin-top: 10px;
+            pointer-events: auto;
+        }
+    </style>
 </head>
 <body>
-  <div id="loading-screen">
-    <h1>People vs Animal Battle Simulator</h1>
-    <p>Loading game assets...</p>
-    <div id="loading-bar-container"><div id="loading-bar"></div></div>
-  </div>
-
-  <div id="game-container"></div>
-
-  <div id="ui-container">
-    <div id="setup-ui" class="ui-panel">
-      <h2>Setup Phase</h2>
-      <p>Place your fighters by clicking/tapping</p>
-      <div id="fighter-counter">Fighters: 0/100</div>
-      <button id="start-battle-btn" class="btn">Start Battle</button>
-      <button id="clear-fighters-btn" class="btn btn-secondary">Clear All</button>
-      <label for="animal-select">Animal:</label>
-      <select id="animal-select">
-        <option value="gorilla">Gorilla</option>
-        <option value="bear">Bear</option>
-        <option value="lion">Lion</option>
-        <option value="elephant">Elephant</option>
-        <option value="rhinoceros">Rhinoceros</option>
-      </select>
+    <div id="game-container"></div>
+    
+    <div id="ui-overlay">
+        <div id="fighter-counter">Fighters: 0/100</div>
+        <div>
+            <button id="start-btn" class="btn">START BATTLE</button>
+            <button id="clear-btn" class="btn btn-secondary">CLEAR</button>
+        </div>
+        <div>
+            <select id="animal-select">
+                <option value="gorilla">Gorilla</option>
+                <option value="bear">Bear</option>
+                <option value="lion">Lion</option>
+                <option value="elephant">Elephant</option>
+                <option value="rhinoceros">Rhinoceros</option>
+            </select>
+        </div>
     </div>
-
-    <div id="battle-ui" class="ui-panel">
-      <div>Time: <span id="battle-time">0:00</span></div>
-      <div>Fighters Alive: <span id="fighters-alive">0</span>/<span id="fighters-total">0</span></div>
-      <div>Animal: <span id="animal-type">Gorilla</span></div>
-      <div id="animal-health-bar-container"><div id="animal-health-bar"></div></div>
-      <div id="commander-health-bar-container"><div id="commander-health-bar"></div></div>
+    
+    <div id="battle-ui">
+        <div>Time: <span id="battle-time">0:00</span></div>
+        <div>Fighters: <span id="fighters-alive">0</span>/<span id="fighters-total">0</span></div>
+        <div>Animal: <span id="animal-type">Gorilla</span></div>
+        <div>Animal Health:</div>
+        <div class="health-bar-container">
+            <div id="animal-health-bar" class="health-bar animal-health"></div>
+        </div>
+        <div>Commander Health:</div>
+        <div class="health-bar-container">
+            <div id="commander-health-bar" class="health-bar commander-health"></div>
+        </div>
     </div>
-
-    <div id="result-ui" class="ui-panel">
-      <h2 id="result-title">Battle Results</h2>
-      <div>Final Score: <span id="final-score">0</span></div>
-      <div>Time: <span id="result-time">0:00</span></div>
-      <div>Fighters Lost: <span id="fighters-lost">0</span>/<span id="result-fighters-total">0</span></div>
-      <button id="restart-btn" class="btn">Play Again</button>
-      <button id="share-btn" class="btn">Share Results</button>
+    
+    <div id="formation-menu">
+        <div>Formations:</div>
+        <button class="formation-btn active" data-formation="circle">⭕</button>
+        <button class="formation-btn" data-formation="line">—</button>
+        <button class="formation-btn" data-formation="arrow">▲</button>
+        <button class="formation-btn" data-formation="scatter">⚫</button>
     </div>
-  </div>
-
-  <!-- Debug overlay -->
-  <div id="debug-overlay" style="display:none; position:absolute;top:10px;right:10px;
-       background:rgba(0,0,0,.7);color:#fff;padding:10px;border-radius:5px;z-index:9999;">
-    <div id="debug-info"></div>
-  </div>
-
-  <!-- Three.js & Ammo.js -->
-  <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/ammo.js@0.0.2/builds/ammo.js"></script>
-
-  <!-- Main Game Script -->
-  <script>
-    class BattleSimulator {
-      constructor({ container, isMobile }) {
-        this.container = container;
-        this.isMobile = isMobile;
-        this.clock = new THREE.Clock();
-        this.state = { phase:'setup', fighters:[], animalHealth:200, timeElapsed:0 };
-        this._initScene();
-        this._setupInput();
-        this._animate();
-      }
-
-      _initScene() {
-        // Renderer
-        this.renderer = new THREE.WebGLRenderer({ antialias:true });
-        this.renderer.setSize(window.innerWidth, window.innerHeight);
-        this.container.appendChild(this.renderer.domElement);
-
-        // Camera & Scene
-        this.scene = new THREE.Scene();
-        this.camera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, .1, 1000);
-        this.camera.position.set(0,30,30);
-        this.camera.lookAt(0,0,0);
-
-        // Lights
-        const ambient = new THREE.AmbientLight(0xCCCCCC, .4);
-        const dir = new THREE.DirectionalLight(0xFFFFCC, .8);
-        dir.position.set(20,30,20);
-        this.scene.add(ambient, dir);
-
-        // Ground
-        const geo = new THREE.PlaneGeometry(100,100);
-        const mat = new THREE.MeshStandardMaterial({color:0x4CAF50, roughness:.8, metalness:.1});
-        this.ground = new THREE.Mesh(geo, mat);
-        this.ground.rotation.x = -Math.PI/2;
-        this.scene.add(this.ground);
-
-        // Animal
-        const ag = new THREE.BoxGeometry(3,2.5,5);
-        const am = new THREE.MeshStandardMaterial({color:0x8B4513});
-        this.animal = new THREE.Mesh(ag, am);
-        this.animal.position.set(0,1.25,-30);
-        this.scene.add(this.animal);
-
-        window.addEventListener('resize', ()=>this._onResize());
-      }
-
-      _setupInput() {
-        // Raycaster for placement
-        this.raycaster = new THREE.Raycaster();
-        this.mouse = new THREE.Vector2();
-        window.addEventListener('mousedown', e=>this._onPointer(e.clientX, e.clientY));
-        window.addEventListener('touchstart', e=> {
-          e.preventDefault();
-          this._onPointer(e.touches[0].clientX, e.touches[0].clientY);
-        });
-
-        // UI handlers
-        document.getElementById('start-battle-btn').onclick = ()=> this.startBattle();
-        document.getElementById('clear-fighters-btn').onclick = ()=> this.clearFighters();
-        document.getElementById('restart-btn').onclick = ()=> this._reset();
-        document.getElementById('share-btn').onclick = ()=> alert('Share feature TBD');
-        document.getElementById('animal-select').onchange = e=>
-          document.getElementById('animal-type').textContent = this.config.animalType = e.target.value;
-
-        // Keyboard shortcut
-        document.addEventListener('keydown', e=>{
-          if(e.code==='Space' && this.state.phase==='setup') this.startBattle();
-        });
-      }
-
-      _onPointer(x,y) {
-        if(this.state.phase!=='setup') return;
-        this.mouse.x = (x/window.innerWidth)*2 -1;
-        this.mouse.y = -(y/window.innerHeight)*2 +1;
-        this.raycaster.setFromCamera(this.mouse, this.camera);
-        const hits = this.raycaster.intersectObject(this.ground);
-        if(hits.length) this._createFighter(hits[0].point);
-      }
-
-      _createFighter(pos) {
-        if(this.state.fighters.length>=100) return;
-        if(Math.abs(pos.x)>50||Math.abs(pos.z)>50) return;
-        const fg = new THREE.BoxGeometry(.7,1.8,.7);
-        const fm = new THREE.MeshStandardMaterial({color:0x2196F3});
-        const fighter = new THREE.Mesh(fg, fm);
-        fighter.position.set(pos.x, .9, pos.z);
-        fighter.userData = { health:30 };
-        fighter.update = delta => {
-          // simple AI: move toward animal
-          const dir = new THREE.Vector3().subVectors(this.animal.position, fighter.position).normalize();
-          fighter.position.addScaledVector(dir, delta*5);
-        };
-        this.scene.add(fighter);
-        this.state.fighters.push(fighter);
-        this._updateFighterCounter();
-      }
-
-      _updateFighterCounter() {
-        document.getElementById('fighter-counter').textContent =
-          `Fighters: ${this.state.fighters.length}/100`;
-      }
-
-      startBattle() {
-        if(!this.state.fighters.length) {
-          alert('Place at least one fighter first!');
-          return false;
-        }
-        this.state.phase='battle';
-        document.getElementById('setup-ui').style.display='none';
-        document.getElementById('battle-ui').style.display='block';
-        document.getElementById('fighters-total').textContent=this.state.fighters.length;
-        return true;
-      }
-
-      clearFighters() {
-        this.state.fighters.forEach(f=>this.scene.remove(f));
-        this.state.fighters.length=0;
-        this._updateFighterCounter();
-      }
-
-      _checkCollisions() {
-        const aBox = new THREE.Box3().setFromObject(this.animal);
-        this.state.fighters.forEach(f=>{
-          if(f.userData.health>0) {
-            const fBox = new THREE.Box3().setFromObject(f);
-            if(fBox.intersectsBox(aBox)) {
-              this.state.animalHealth -=10;
-              f.userData.health -=20;
+    
+    <div id="result-ui">
+        <h2 id="result-title">Battle Results</h2>
+        <div id="result-stats">
+            <div>Final Score: <span id="final-score">0</span></div>
+            <div>Time: <span id="result-time">0:00</span></div>
+            <div>Fighters Lost: <span id="fighters-lost">0</span>/<span id="result-fighters-total">0</span></div>
+        </div>
+        <div>
+            <button id="restart-btn" class="btn">PLAY AGAIN</button>
+        </div>
+    </div>
+    
+    <div id="controls-hint">
+        <b>Controls:</b><br>
+        WASD - Move Commander<br>
+        E - Rally nearby fighters<br>
+        F - Change formation<br>
+        Mouse Click - Attack<br>
+        C - Change camera view
+    </div>
+    
+    <div id="debug-overlay">
+        <div>Debug Mode</div>
+        <div id="debug-info">Loading...</div>
+    </div>
+    
+    <!-- Load Three.js -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js"></script>
+    
+    <!-- Game implementation -->
+    <script>
+        // Game class with full functionality
+        class BattleGame {
+            constructor() {
+                // Configuration
+                this.config = {
+                    arenaSize: 100,
+                    maxFighters: 100,
+                    animalType: 'gorilla'
+                };
+                
+                // Game state
+                this.state = {
+                    phase: 'setup', // 'setup', 'battle', 'result'
+                    fighters: [],
+                    time: 0,
+                    score: 0
+                };
+                
+                // Animal characteristics by type
+                this.animalTypes = {
+                    gorilla: {
+                        health: 1000,
+                        attackPower: 25,
+                        speed: 8,
+                        size: { x: 3, y: 2.5, z: 2 },
+                        color: 0x8B4513
+                    },
+                    bear: {
+                        health: 1200,
+                        attackPower: 20,
+                        speed: 7,
+                        size: { x: 3.5, y: 3, z: 2 },
+                        color: 0x654321
+                    },
+                    lion: {
+                        health: 800,
+                        attackPower: 18,
+                        speed: 12,
+                        size: { x: 2.5, y: 1.8, z: 4 },
+                        color: 0xD2B48C
+                    },
+                    elephant: {
+                        health: 2000,
+                        attackPower: 30,
+                        speed: 5,
+                        size: { x: 5, y: 4, z: 6 },
+                        color: 0x808080
+                    },
+                    rhinoceros: {
+                        health: 1500,
+                        attackPower: 25,
+                        speed: 7,
+                        size: { x: 4, y: 2.5, z: 5 },
+                        color: 0x696969
+                    }
+                };
+                
+                // Initialize Three.js
+                this.initRenderer();
+                this.initScene();
+                this.initCamera();
+                this.initLights();
+                
+                // Create battlefield
+                this.createBattlefield();
+                
+                // Create animal
+                this.createAnimal();
+                
+                // Set up input handlers
+                this.setupInput();
+                
+                // Set up UI event handlers
+                this.setupUI();
+                
+                // Set up clock for timing
+                this.clock = new THREE.Clock();
+                
+                // Start animation loop
+                this.animate();
+                
+                // Update fighter counter
+                this.updateFighterCounter();
+                
+                // Formation settings
+                this.formation = 'circle';
+                
+                // Camera settings
+                this.cameraMode = 'overview';
+                this.cameraTarget = new THREE.Vector3();
+                this.cameraOffset = new THREE.Vector3(0, 30, 30);
+                
+                // Window resize handler
+                window.addEventListener('resize', () => this.onWindowResize());
             }
-          }
+            
+            initRenderer() {
+                this.renderer = new THREE.WebGLRenderer({ antialias: true });
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+                this.renderer.setClearColor(0x87CEEB); // Sky blue
+                this.renderer.shadowMap.enabled = true;
+                this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+                document.getElementById('game-container').appendChild(this.renderer.domElement);
+            }
+            
+            initScene() {
+                this.scene = new THREE.Scene();
+                this.scene.fog = new THREE.Fog(0x87CEEB, 60, 100);
+            }
+            
+            initCamera() {
+                this.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+                this.camera.position.set(0, 30, 30);
+                this.camera.lookAt(0, 0, 0);
+            }
+            
+            initLights() {
+                // Ambient light
+                const ambientLight = new THREE.AmbientLight(0xCCCCCC, 0.4);
+                this.scene.add(ambientLight);
+                
+                // Directional light (sun)
+                const directionalLight = new THREE.DirectionalLight(0xFFFFCC, 0.8);
+                directionalLight.position.set(20, 30, 20);
+                directionalLight.castShadow = true;
+                
+                // Shadow settings
+                directionalLight.shadow.mapSize.width = 2048;
+                directionalLight.shadow.mapSize.height = 2048;
+                
+                const shadowSize = 50;
+                directionalLight.shadow.camera.left = -shadowSize;
+                directionalLight.shadow.camera.right = shadowSize;
+                directionalLight.shadow.camera.top = shadowSize;
+                directionalLight.shadow.camera.bottom = -shadowSize;
+                directionalLight.shadow.camera.near = 1;
+                directionalLight.shadow.camera.far = 100;
+                
+                this.scene.add(directionalLight);
+            }
+            
+            createBattlefield() {
+                const arenaSize = this.config.arenaSize;
+                
+                // Create ground
+                const groundGeometry = new THREE.PlaneGeometry(arenaSize, arenaSize, 32, 32);
+                const groundMaterial = new THREE.MeshStandardMaterial({ 
+                    color: 0x4CAF50,
+                    roughness: 0.8,
+                    metalness: 0.1
+                });
+                this.ground = new THREE.Mesh(groundGeometry, groundMaterial);
+                this.ground.rotation.x = -Math.PI / 2;
+                this.ground.receiveShadow = true;
+                this.scene.add(this.ground);
+                
+                // Add some visual indicators for battlefield edges
+                const edgeGeometry = new THREE.BoxGeometry(arenaSize, 1, 1);
+                const edgeMaterial = new THREE.MeshBasicMaterial({ color: 0xFFFFFF });
+                
+                // North edge
+                const northEdge = new THREE.Mesh(edgeGeometry, edgeMaterial);
+                northEdge.position.set(0, 0.5, -arenaSize / 2);
+                this.scene.add(northEdge);
+                
+                // South edge
+                const southEdge = new THREE.Mesh(edgeGeometry, edgeMaterial);
+                southEdge.position.set(0, 0.5, arenaSize / 2);
+                this.scene.add(southEdge);
+                
+                // East edge
+                const eastEdge = new THREE.Mesh(edgeGeometry, edgeMaterial);
+                eastEdge.rotation.y = Math.PI / 2;
+                eastEdge.position.set(arenaSize / 2, 0.5, 0);
+                this.scene.add(eastEdge);
+                
+                // West edge
+                const westEdge = new THREE.Mesh(edgeGeometry, edgeMaterial);
+                westEdge.rotation.y = Math.PI / 2;
+                westEdge.position.set(-arenaSize / 2, 0.5, 0);
+                this.scene.add(westEdge);
+                
+                // Add some trees and rocks for visual interest
+                this.addEnvironmentFeatures();
+            }
+            
+            addEnvironmentFeatures() {
+                const numTrees = 15;
+                const numRocks = 8;
+                
+                // Add trees
+                for (let i = 0; i < numTrees; i++) {
+                    const x = Math.random() * this.config.arenaSize - this.config.arenaSize / 2;
+                    const z = Math.random() * this.config.arenaSize - this.config.arenaSize / 2;
+                    
+                    // Keep center area clear
+                    if (Math.abs(x) < 10 && Math.abs(z) < 10) continue;
+                    
+                    this.createTree(new THREE.Vector3(x, 0, z));
+                }
+                
+                // Add rocks
+                for (let i = 0; i < numRocks; i++) {
+                    const x = Math.random() * this.config.arenaSize - this.config.arenaSize / 2;
+                    const z = Math.random() * this.config.arenaSize - this.config.arenaSize / 2;
+                    
+                    // Keep center area clear
+                    if (Math.abs(x) < 10 && Math.abs(z) < 10) continue;
+                    
+                    this.createRock(new THREE.Vector3(x, 0, z));
+                }
+            }
+            
+            createTree(position) {
+                // Create trunk
+                const trunkGeometry = new THREE.CylinderGeometry(0.4, 0.5, 5);
+                const trunkMaterial = new THREE.MeshStandardMaterial({ color: 0x8B4513 });
+                const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
+                trunk.position.y = 2.5;
+                trunk.position.x = position.x;
+                trunk.position.z = position.z;
+                trunk.castShadow = true;
+                trunk.receiveShadow = true;
+                
+                // Create leaves
+                const leavesGeometry = new THREE.ConeGeometry(2, 4, 8);
+                const leavesMaterial = new THREE.MeshStandardMaterial({ color: 0x2E8B57 });
+                const leaves = new THREE.Mesh(leavesGeometry, leavesMaterial);
+                leaves.position.y = 7;
+                leaves.position.x = position.x;
+                leaves.position.z = position.z;
+                leaves.castShadow = true;
+                leaves.receiveShadow = true;
+                
+                this.scene.add(trunk);
+                this.scene.add(leaves);
+            }
+            
+            createRock(position) {
+                const size = 0.5 + Math.random() * 1.5;
+                const rockGeometry = new THREE.DodecahedronGeometry(size);
+                const rockMaterial = new THREE.MeshStandardMaterial({ 
+                    color: 0x808080,
+                    roughness: 0.9
+                });
+                
+                const rock = new THREE.Mesh(rockGeometry, rockMaterial);
+                rock.position.copy(position);
+                rock.position.y = size / 2;
+                rock.rotation.set(
+                    Math.random() * Math.PI, 
+                    Math.random() * Math.PI, 
+                    Math.random() * Math.PI
+                );
+                rock.castShadow = true;
+                rock.receiveShadow = true;
+                
+                this.scene.add(rock);
+            }
+            
+            createAnimal() {
+                const animalData = this.animalTypes[this.config.animalType];
+                
+                // Create animal mesh
+                const animalGeometry = new THREE.BoxGeometry(
+                    animalData.size.x, 
+                    animalData.size.y, 
+                    animalData.size.z
+                );
+                const animalMaterial = new THREE.MeshStandardMaterial({ 
+                    color: animalData.color 
+                });
+                
+                this.animal = {
+                    mesh: new THREE.Mesh(animalGeometry, animalMaterial),
+                    health: animalData.health,
+                    maxHealth: animalData.health,
+                    attackPower: animalData.attackPower,
+                    speed: animalData.speed,
+                    position: new THREE.Vector3(0, animalData.size.y / 2, -30),
+                    velocity: new THREE.Vector3(),
+                    rotation: 0,
+                    state: 'idle', // 'idle', 'charging', 'attacking'
+                    target: null,
+                    attackRange: 2,
+                    lastAttackTime: 0
+                };
+                
+                this.animal.mesh.position.copy(this.animal.position);
+                this.animal.mesh.castShadow = true;
+                this.animal.mesh.receiveShadow = true;
+                
+                this.scene.add(this.animal.mesh);
+            }
+            
+            createCommander() {
+                // Create commander mesh
+                const commanderGeometry = new THREE.BoxGeometry(1, 2, 1);
+                const commanderMaterial = new THREE.MeshStandardMaterial({ color: 0xF44336 });
+                
+                this.commander = {
+                    mesh: new THREE.Mesh(commanderGeometry, commanderMaterial),
+                    health: 200,
+                    maxHealth: 200,
+                    attackPower: 5,
+                    position: new THREE.Vector3(0, 1, 0),
+                    velocity: new THREE.Vector3(),
+                    rotation: 0,
+                    attackRange: 2,
+                    lastAttackTime: 0
+                };
+                
+                this.commander.mesh.position.copy(this.commander.position);
+                this.commander.mesh.castShadow = true;
+                this.commander.mesh.receiveShadow = true;
+                
+                this.scene.add(this.commander.mesh);
+            }
+            
+            setupInput() {
+                // Raycaster for mouse picking
+                this.raycaster = new THREE.Raycaster();
+                this.mouse = new THREE.Vector2();
+                
+                // Input states
+                this.keys = {};
+                this.mouseDown = false;
+                
+                // Add event listeners
+                window.addEventListener('mousedown', (event) => {
+                    this.mouseDown = true;
+                    this.onMouseDown(event);
+                });
+                
+                window.addEventListener('mouseup', () => {
+                    this.mouseDown = false;
+                });
+                
+                window.addEventListener('touchstart', (event) => {
+                    this.mouseDown = true;
+                    this.onTouchStart(event);
+                });
+                
+                window.addEventListener('touchend', () => {
+                    this.mouseDown = false;
+                });
+                
+                window.addEventListener('keydown', (event) => {
+                    this.keys[event.code] = true;
+                    this.onKeyDown(event);
+                });
+                
+                window.addEventListener('keyup', (event) => {
+                    this.keys[event.code] = false;
+                });
+            }
+            
+            setupUI() {
+                // Start button
+                document.getElementById('start-btn').addEventListener('click', () => this.startBattle());
+                
+                // Clear button
+                document.getElementById('clear-btn').addEventListener('click', () => this.clearFighters());
+                
+                // Animal selection
+                document.getElementById('animal-select').addEventListener('change', (event) => {
+                    this.config.animalType = event.target.value;
+                    
+                    // Update animal if already created
+                    if (this.animal) {
+                        this.scene.remove(this.animal.mesh);
+                        this.createAnimal();
+                    }
+                });
+                
+                // Restart button
+                document.getElementById('restart-btn').addEventListener('click', () => this.setupBattle());
+                
+                // Formation buttons
+                const formationButtons = document.querySelectorAll('.formation-btn');
+                formationButtons.forEach(button => {
+                    button.addEventListener('click', () => {
+                        // Set active class
+                        formationButtons.forEach(btn => btn.classList.remove('active'));
+                        button.classList.add('active');
+                        
+                        // Set formation
+                        this.formation = button.dataset.formation;
+                    });
+                });
+            }
+            
+            onMouseDown(event) {
+                // Get mouse position
+                this.mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+                this.mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+                
+                // Handle based on game phase
+                if (this.state.phase === 'setup') {
+                    // Check for ground intersection
+                    this.raycaster.setFromCamera(this.mouse, this.camera);
+                    const intersects = this.raycaster.intersectObject(this.ground);
+                    
+                    if (intersects.length > 0) {
+                        // Place fighter at intersection point
+                        this.placeFighter(intersects[0].point);
+                    }
+                }
+            }
+            
+            onTouchStart(event) {
+                event.preventDefault();
+                
+                // Get touch position
+                const touch = event.touches[0];
+                this.mouse.x = (touch.clientX / window.innerWidth) * 2 - 1;
+                this.mouse.y = -(touch.clientY / window.innerHeight) * 2 + 1;
+                
+                // Handle based on game phase
+                if (this.state.phase === 'setup') {
+                    // Check for ground intersection
+                    this.raycaster.setFromCamera(this.mouse, this.camera);
+                    const intersects = this.raycaster.intersectObject(this.ground);
+                    
+                    if (intersects.length > 0) {
+                        // Place fighter at intersection point
+                        this.placeFighter(intersects[0].point);
+                    }
+                }
+            }
+            
+            onKeyDown(event) {
+                // Toggle camera mode with C key
+                if (event.code === 'KeyC') {
+                    this.cycleCamera();
+                }
+                
+                // Change formation with F key
+                if (event.code === 'KeyF' && this.state.phase === 'battle') {
+                    this.cycleFormation();
+                }
+                
+                // Rally fighters with E key
+                if (event.code === 'KeyE' && this.state.phase === 'battle') {
+                    this.rallyFighters();
+                }
+                
+                // Start battle with space (for convenience)
+                if (event.code === 'Space' && this.state.phase === 'setup') {
+                    this.startBattle();
+                }
+            }
+            
+            cycleCamera() {
+                if (this.cameraMode === 'overview') {
+                    this.cameraMode = 'commander';
+                } else if (this.cameraMode === 'commander') {
+                    this.cameraMode = 'animal';
+                } else {
+                    this.cameraMode = 'overview';
+                }
+            }
+            
+            cycleFormation() {
+                const formations = ['circle', 'line', 'arrow', 'scatter'];
+                const currentIndex = formations.indexOf(this.formation);
+                const nextIndex = (currentIndex + 1) % formations.length;
+                this.formation = formations[nextIndex];
+                
+                // Update UI
+                const formationButtons = document.querySelectorAll('.formation-btn');
+                formationButtons.forEach(btn => {
+                    btn.classList.remove('active');
+                    if (btn.dataset.formation === this.formation) {
+                        btn.classList.add('active');
+                    }
+                });
+            }
+            
+            rallyFighters() {
+                if (!this.commander) return;
+                
+                const rallyRadius = 15;
+                
+                // Visual effect
+                const ringGeometry = new THREE.RingGeometry(rallyRadius - 0.5, rallyRadius, 32);
+                const ringMaterial = new THREE.MeshBasicMaterial({
+                    color: 0x4CAF50,
+                    transparent: true,
+                    opacity: 0.5,
+                    side: THREE.DoubleSide
+                });
+                
+                const ring = new THREE.Mesh(ringGeometry, ringMaterial);
+                ring.rotation.x = Math.PI / 2;
+                ring.position.copy(this.commander.position);
+                ring.position.y = 0.1;
+                this.scene.add(ring);
+                
+                // Set commander influence on nearby fighters
+                for (const fighter of this.state.fighters) {
+                    if (fighter.state === 'dead') continue;
+                    
+                    const distance = fighter.position.distanceTo(this.commander.position);
+                    if (distance <= rallyRadius) {
+                        fighter.commanderInfluence = true;
+                    }
+                }
+                
+                // Remove ring after animation
+                setTimeout(() => {
+                    this.scene.remove(ring);
+                    ringGeometry.dispose();
+                    ringMaterial.dispose();
+                }, 1000);
+            }
+            
+            placeFighter(position) {
+                // Check fighter limit
+                if (this.state.fighters.length >= this.config.maxFighters) return;
+                
+                // Check if position is inside battlefield
+                const halfSize = this.config.arenaSize / 2;
+                if (Math.abs(position.x) > halfSize || Math.abs(position.z) > halfSize) {
+                    console.log("Outside battlefield bounds");
+                    return;
+                }
+                
+                // Create fighter mesh
+                const fighterGeometry = new THREE.BoxGeometry(0.7, 1.8, 0.7);
+                const fighterMaterial = new THREE.MeshStandardMaterial({ color: 0x2196F3 });
+                const fighterMesh = new THREE.Mesh(fighterGeometry, fighterMaterial);
+                
+                // Position at ground level
+                fighterMesh.position.copy(position);
+                fighterMesh.position.y = 0.9; // Half height
+                fighterMesh.castShadow = true;
+                fighterMesh.receiveShadow = true;
+                
+                // Create fighter object
+                const fighter = {
+                    mesh: fighterMesh,
+                    health: 50,
+                    maxHealth: 50,
+                    attackPower: 1,
+                    position: position.clone(),
+                    velocity: new THREE.Vector3(),
+                    rotation: 0,
+                    state: 'idle', // 'idle', 'moving', 'attacking', 'fleeing', 'dead'
+                    target: this.animal,
+                    attackRange: 2,
+                    lastAttackTime: 0,
+                    commanderInfluence: false
+                };
+                
+                // Add to scene and fighters array
+                this.scene.add(fighterMesh);
+                this.state.fighters.push(fighter);
+                
+                // Update counter
+                this.updateFighterCounter();
+            }
+            
+            clearFighters() {
+                // Remove all fighters
+                for (const fighter of this.state.fighters) {
+                    this.scene.remove(fighter.mesh);
+                }
+                
+                // Clear array
+                this.state.fighters = [];
+                
+                // Update counter
+                this.updateFighterCounter();
+            }
+            
+            updateFighterCounter() {
+                document.getElementById('fighter-counter').textContent = 
+                    `Fighters: ${this.state.fighters.length}/${this.config.maxFighters}`;
+            }
+            
+            updateBattleUI() {
+                // Update time
+                const minutes = Math.floor(this.state.time / 60);
+                const seconds = Math.floor(this.state.time % 60);
+                document.getElementById('battle-time').textContent = 
+                    `${minutes}:${seconds.toString().padStart(2, '0')}`;
+                
+                // Update fighter count
+                const aliveFighters = this.state.fighters.filter(f => f.state !== 'dead').length;
+                document.getElementById('fighters-alive').textContent = aliveFighters;
+                document.getElementById('fighters-total').textContent = this.state.fighters.length;
+                
+                // Update animal type
+                document.getElementById('animal-type').textContent = 
+                    this.config.animalType.charAt(0).toUpperCase() + this.config.animalType.slice(1);
+                
+                // Update health bars
+                if (this.animal) {
+                    const healthPercent = (this.animal.health / this.animal.maxHealth) * 100;
+                    document.getElementById('animal-health-bar').style.width = `${healthPercent}%`;
+                }
+                
+                if (this.commander) {
+                    const commanderHealthPercent = (this.commander.health / this.commander.maxHealth) * 100;
+                    document.getElementById('commander-health-bar').style.width = `${commanderHealthPercent}%`;
+                }
+            }
+            
+            updateResultUI() {
+                // Update final score
+                document.getElementById('final-score').textContent = this.state.score;
+                
+                // Update time
+                const minutes = Math.floor(this.state.time / 60);
+                const seconds = Math.floor(this.state.time % 60);
+                document.getElementById('result-time').textContent = 
+                    `${minutes}:${seconds.toString().padStart(2, '0')}`;
+                
+                // Update fighter stats
+                const fightersLost = this.state.fighters.filter(f => f.state === 'dead').length;
+                document.getElementById('fighters-lost').textContent = fightersLost;
+                document.getElementById('result-fighters-total').textContent = this.state.fighters.length;
+                
+                // Update title based on result
+                const playerWon = this.animal.health <= 0;
+                document.getElementById('result-title').textContent = playerWon ? 'Victory!' : 'Defeat';
+            }
+            
+            startBattle() {
+                // Check if we have fighters
+                if (this.state.fighters.length === 0) {
+                    alert("Please place at least one fighter before starting the battle!");
+                    return;
+                }
+                
+                // Change phase
+                this.state.phase = 'battle';
+                
+                // Reset time
+                this.state.time = 0;
+                
+                // Create commander
+                this.createCommander();
+                
+                // Hide setup UI, show battle UI
+                document.getElementById('ui-overlay').style.display = 'none';
+                document.getElementById('battle-ui').style.display = 'block';
+                document.getElementById('formation-menu').style.display = 'block';
+                document.getElementById('controls-hint').style.display = 'block';
+                
+                // Update battle UI
+                this.updateBattleUI();
+                
+                console.log("Battle started!");
+            }
+            
+            setupBattle() {
+                // Clear existing entities
+                this.clearBattle();
+                
+                // Change phase
+                this.state.phase = 'setup';
+                
+                // Create animal
+                this.createAnimal();
+                
+                // Show setup UI, hide battle and result UI
+                document.getElementById('ui-overlay').style.display = 'block';
+                document.getElementById('battle-ui').style.display = 'none';
+                document.getElementById('formation-menu').style.display = 'none';
+                document.getElementById('result-ui').style.display = 'none';
+                document.getElementById('controls-hint').style.display = 'none';
+                
+                console.log("Setup phase started");
+            }
+            
+            clearBattle() {
+                // Remove all fighters
+                for (const fighter of this.state.fighters) {
+                    this.scene.remove(fighter.mesh);
+                }
+                this.state.fighters = [];
+                
+                // Remove animal
+                if (this.animal) {
+                    this.scene.remove(this.animal.mesh);
+                    this.animal = null;
+                }
+                
+                // Remove commander
+                if (this.commander) {
+                    this.scene.remove(this.commander.mesh);
+                    this.commander = null;
+                }
+                
+                // Update counter
+                this.updateFighterCounter();
+            }
+            
+            endBattle(playerWins) {
+                // Change phase
+                this.state.phase = 'result';
+                
+                // Calculate score
+                if (playerWins) {
+                    // Base score
+                    this.state.score = 1000;
+                    
+                    // Bonus for remaining fighters
+                    const aliveFighters = this.state.fighters.filter(f => f.state !== 'dead').length;
+                    this.state.score += aliveFighters * 100;
+                    
+                    // Time bonus (faster = better)
+                    const timeBonus = Math.max(0, 300 - this.state.time) * 10;
+                    this.state.score += timeBonus;
+                } else {
+                    // Partial score for damage done
+                    const damagePercent = 1 - (this.animal.health / this.animal.maxHealth);
+                    this.state.score = Math.floor(damagePercent * 500);
+                }
+                
+                // Show result UI, hide battle UI
+                document.getElementById('battle-ui').style.display = 'none';
+                document.getElementById('formation-menu').style.display = 'none';
+                document.getElementById('controls-hint').style.display = 'none';
+                document.getElementById('result-ui').style.display = 'block';
+                
+                // Update result UI
+                this.updateResultUI();
+                
+                console.log(`Battle ended: ${playerWins ? 'Victory' : 'Defeat'}`);
+            }
+            
+            onWindowResize() {
+                // Update camera and renderer
+                this.camera.aspect = window.innerWidth / window.innerHeight;
+                this.camera.updateProjectionMatrix();
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+            }
+            
+            update(delta) {
+                // Update based on game phase
+                switch (this.state.phase) {
+                    case 'setup':
+                        this.updateSetupPhase(delta);
+                        break;
+                    case 'battle':
+                        this.updateBattlePhase(delta);
+                        break;
+                    case 'result':
+                        // No updates needed in result phase
+                        break;
+                }
+                
+                // Update camera
+                this.updateCamera(delta);
+                
+                // Update debug info
+                this.updateDebugInfo();
+            }
+            
+            updateSetupPhase(delta) {
+                // Rotate animal for visual interest
+                if (this.animal) {
+                    this.animal.rotation += 0.5 * delta;
+                    this.animal.mesh.rotation.y = this.animal.rotation;
+                }
+            }
+            
+            updateBattlePhase(delta) {
+                // Update time
+                this.state.time += delta;
+                
+                // Update UI
+                this.updateBattleUI();
+                
+                // Update commander
+                if (this.commander) {
+                    this.updateCommander(delta);
+                }
+                
+                // Update fighters
+                for (const fighter of this.state.fighters) {
+                    if (fighter.state !== 'dead') {
+                        this.updateFighter(fighter, delta);
+                    }
+                }
+                
+                // Update animal
+                if (this.animal) {
+                    this.updateAnimal(delta);
+                }
+                
+                // Check win/lose conditions
+                this.checkBattleEnd();
+            }
+            
+            updateCommander(delta) {
+                const commander = this.commander;
+                
+                // Reset velocity
+                commander.velocity.set(0, 0, 0);
+                
+                // Movement based on keys
+                const moveSpeed = 15 * delta;
+                
+                // Calculate camera-relative movement directions
+                const cameraForward = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion);
+                cameraForward.y = 0;
+                cameraForward.normalize();
+                
+                const cameraRight = new THREE.Vector3(1, 0, 0).applyQuaternion(this.camera.quaternion);
+                cameraRight.y = 0;
+                cameraRight.normalize();
+                
+                // WASD movement
+                if (this.keys['KeyW']) {
+                    commander.velocity.add(cameraForward.clone().multiplyScalar(moveSpeed));
+                }
+                if (this.keys['KeyS']) {
+                    commander.velocity.add(cameraForward.clone().multiplyScalar(-moveSpeed));
+                }
+                if (this.keys['KeyA']) {
+                    commander.velocity.add(cameraRight.clone().multiplyScalar(-moveSpeed));
+                }
+                if (this.keys['KeyD']) {
+                    commander.velocity.add(cameraRight.clone().multiplyScalar(moveSpeed));
+                }
+                
+                // Update position
+                commander.position.add(commander.velocity);
+                
+                // Keep within arena bounds
+                const halfSize = this.config.arenaSize / 2 - 1;
+                commander.position.x = Math.max(-halfSize, Math.min(halfSize, commander.position.x));
+                commander.position.z = Math.max(-halfSize, Math.min(halfSize, commander.position.z));
+                
+                // Update rotation to face movement direction
+                if (commander.velocity.lengthSq() > 0.001) {
+                    commander.rotation = Math.atan2(commander.velocity.x, commander.velocity.z);
+                }
+                
+                // Update mesh
+                commander.mesh.position.copy(commander.position);
+                commander.mesh.rotation.y = commander.rotation;
+                
+                // Check for attack
+                if (this.mouseDown) {
+                    this.commanderAttack();
+                }
+            }
+            
+            commanderAttack() {
+                if (!this.commander || !this.animal) return;
+                
+                // Check cooldown
+                if (this.state.time - this.commander.lastAttackTime < 0.5) return;
+                
+                // Check distance to animal
+                const distance = this.commander.position.distanceTo(this.animal.position);
+                
+                if (distance <= this.commander.attackRange) {
+                    // Deal damage
+                    this.animal.health -= this.commander.attackPower;
+                    
+                    // Reset cooldown
+                    this.commander.lastAttackTime = this.state.time;
+                    
+                    // Attack effect
+                    this.createAttackEffect(
+                        this.commander.position.clone().add(new THREE.Vector3(0, 1, 0)),
+                        this.animal.position.clone().add(new THREE.Vector3(0, 1, 0))
+                    );
+                    
+                    console.log(`Commander attacked! Animal health: ${this.animal.health}`);
+                }
+            }
+            
+            createAttackEffect(start, end) {
+                // Create line between attacker and target
+                const points = [start, end];
+                const geometry = new THREE.BufferGeometry().setFromPoints(points);
+                const material = new THREE.LineBasicMaterial({ color: 0xff0000 });
+                const line = new THREE.Line(geometry, material);
+                
+                this.scene.add(line);
+                
+                // Remove after short duration
+                setTimeout(() => {
+                    this.scene.remove(line);
+                    geometry.dispose();
+                    material.dispose();
+                }, 100);
+            }
+            
+            updateFighter(fighter, delta) {
+                // Calculate behavior based on state
+                switch (fighter.state) {
+                    case 'idle':
+                        // Transition to moving state
+                        fighter.state = 'moving';
+                        break;
+                        
+                    case 'moving':
+                        // Move toward target
+                        if (fighter.target) {
+                            const direction = new THREE.Vector3()
+                                .subVectors(fighter.target.position, fighter.position)
+                                .normalize();
+                            
+                            fighter.velocity = direction.multiplyScalar(5 * delta);
+                            fighter.position.add(fighter.velocity);
+                            
+                            // Update rotation to face direction
+                            if (fighter.velocity.lengthSq() > 0.001) {
+                                fighter.rotation = Math.atan2(fighter.velocity.x, fighter.velocity.z);
+                            }
+                            
+                            // If close enough to attack, change state
+                            const distance = fighter.position.distanceTo(fighter.target.position);
+                            if (distance <= fighter.attackRange) {
+                                fighter.state = 'attacking';
+                            }
+                        }
+                        break;
+                        
+                    case 'attacking':
+                        // Attack target
+                        if (fighter.target) {
+                            const distance = fighter.position.distanceTo(fighter.target.position);
+                            
+                            // If too far, go back to moving
+                            if (distance > fighter.attackRange) {
+                                fighter.state = 'moving';
+                                break;
+                            }
+                            
+                            // Check cooldown
+                            if (this.state.time - fighter.lastAttackTime < 1) break;
+                            
+                            // Deal damage
+                            fighter.target.health -= fighter.attackPower;
+                            
+                            // Reset cooldown
+                            fighter.lastAttackTime = this.state.time;
+                            
+                            // Attack effect
+                            this.createAttackEffect(
+                                fighter.position.clone().add(new THREE.Vector3(0, 1, 0)),
+                                fighter.target.position.clone().add(new THREE.Vector3(0, 1, 0))
+                            );
+                        }
+                        break;
+                        
+                    case 'fleeing':
+                        // Run away from animal
+                        if (fighter.target) {
+                            const direction = new THREE.Vector3()
+                                .subVectors(fighter.position, fighter.target.position)
+                                .normalize();
+                            
+                            fighter.velocity = direction.multiplyScalar(8 * delta); // Flee faster
+                            fighter.position.add(fighter.velocity);
+                            
+                            // Update rotation to face direction
+                            if (fighter.velocity.lengthSq() > 0.001) {
+                                fighter.rotation = Math.atan2(fighter.velocity.x, fighter.velocity.z);
+                            }
+                            
+                            // If far enough, go back to moving
+                            const distance = fighter.position.distanceTo(fighter.target.position);
+                            if (distance > 20) {
+                                fighter.state = 'moving';
+                            }
+                        }
+                        break;
+                }
+                
+                // Apply formation influence if under commander influence
+                if (fighter.commanderInfluence && this.commander) {
+                    this.applyFormation(fighter);
+                    fighter.commanderInfluence = false;
+                }
+                
+                // Check health - flee if low
+                if (fighter.health < fighter.maxHealth * 0.3 && fighter.state !== 'fleeing') {
+                    fighter.state = 'fleeing';
+                }
+                
+                // Update mesh
+                fighter.mesh.position.copy(fighter.position);
+                fighter.mesh.rotation.y = fighter.rotation;
+                
+                // Keep in arena bounds
+                const halfSize = this.config.arenaSize / 2 - 1;
+                fighter.position.x = Math.max(-halfSize, Math.min(halfSize, fighter.position.x));
+                fighter.position.z = Math.max(-halfSize, Math.min(halfSize, fighter.position.z));
+            }
+            
+            applyFormation(fighter) {
+                if (!this.commander) return;
+                
+                let formationPosition = new THREE.Vector3();
+                const fighterIndex = this.state.fighters.indexOf(fighter);
+                const fighterCount = this.state.fighters.length;
+                
+                // Commander's forward direction
+                const commanderDirection = new THREE.Vector3(0, 0, 1).applyAxisAngle(
+                    new THREE.Vector3(0, 1, 0),
+                    this.commander.rotation
+                );
+                
+                // Commander's right direction
+                const commanderRight = new THREE.Vector3(1, 0, 0).applyAxisAngle(
+                    new THREE.Vector3(0, 1, 0),
+                    this.commander.rotation
+                );
+                
+                // Formation center (in front of commander)
+                const formationCenter = this.commander.position.clone().add(
+                    commanderDirection.clone().multiplyScalar(5)
+                );
+                
+                switch (this.formation) {
+                    case 'circle':
+                        // Position in circle around formation center
+                        const radius = Math.min(fighterCount * 0.2, 10);
+                        const angle = (fighterIndex / fighterCount) * Math.PI * 2;
+                        
+                        formationPosition.x = formationCenter.x + Math.cos(angle) * radius;
+                        formationPosition.z = formationCenter.z + Math.sin(angle) * radius;
+                        formationPosition.y = 0;
+                        break;
+                    
+                    case 'line':
+                        // Position in line perpendicular to commander direction
+                        const lineWidth = Math.min(fighterCount * 0.5, 20);
+                        const offset = (fighterIndex / (fighterCount - 1) - 0.5) * lineWidth;
+                        
+                        formationPosition = formationCenter.clone().add(
+                            commanderRight.clone().multiplyScalar(offset)
+                        );
+                        break;
+                    
+                    case 'arrow':
+                        // Position in arrow/wedge formation
+                        // First fighter at point
+                        if (fighterIndex === 0) {
+                            formationPosition = formationCenter.clone().add(
+                                commanderDirection.clone().multiplyScalar(2)
+                            );
+                        } else {
+                            // Rest in V formation
+                            const rows = Math.ceil(Math.sqrt(fighterCount));
+                            const row = Math.floor(fighterIndex / rows);
+                            const col = fighterIndex % rows;
+                            
+                            // V shape gets wider as rows go back
+                            const rowWidth = (row + 1) * 2;
+                            const rowOffset = (col / (rows - 1) - 0.5) * rowWidth;
+                            
+                            formationPosition = formationCenter.clone()
+                                .add(commanderDirection.clone().multiplyScalar(-row * 2))
+                                .add(commanderRight.clone().multiplyScalar(rowOffset));
+                        }
+                        break;
+                    
+                    case 'scatter':
+                        // Random positions around formation center
+                        const angle1 = fighterIndex * 0.7;
+                        const distance = (Math.sin(fighterIndex) * 0.5 + 0.5) * 10;
+                        
+                        formationPosition.x = formationCenter.x + Math.cos(angle1) * distance;
+                        formationPosition.z = formationCenter.z + Math.sin(angle1) * distance;
+                        formationPosition.y = 0;
+                        break;
+                }
+                
+                // Apply formation influence - pull fighter toward formation position
+                const toFormation = new THREE.Vector3().subVectors(formationPosition, fighter.position);
+                const distance = toFormation.length();
+                
+                // Only apply if fighter needs to move significantly
+                if (distance > 1) {
+                    fighter.state = 'moving';
+                    fighter.velocity = toFormation.normalize().multiplyScalar(Math.min(distance * 0.1, 0.5));
+                    fighter.target = this.animal;
+                }
+            }
+            
+            updateAnimal(delta) {
+                if (!this.animal) return;
+                
+                const animal = this.animal;
+                
+                // Find target (closest fighter or commander)
+                let closestTarget = null;
+                let closestDistance = Infinity;
+                
+                // Check fighters
+                for (const fighter of this.state.fighters) {
+                    if (fighter.state === 'dead') continue;
+                    
+                    const distance = animal.position.distanceTo(fighter.position);
+                    if (distance < closestDistance) {
+                        closestDistance = distance;
+                        closestTarget = fighter;
+                    }
+                }
+                
+                // Check commander
+                if (this.commander) {
+                    const distance = animal.position.distanceTo(this.commander.position);
+                    if (distance < closestDistance) {
+                        closestDistance = distance;
+                        closestTarget = this.commander;
+                    }
+                }
+                
+                animal.target = closestTarget;
+                
+                // Update based on state
+                switch (animal.state) {
+                    case 'idle':
+                        // If target found, start charging
+                        if (animal.target) {
+                            animal.state = 'charging';
+                        }
+                        break;
+                    
+                    case 'charging':
+                        // Move toward target
+                        if (animal.target) {
+                            const direction = new THREE.Vector3()
+                                .subVectors(animal.target.position, animal.position)
+                                .normalize();
+                            
+                            animal.velocity = direction.multiplyScalar(animal.speed * delta);
+                            animal.position.add(animal.velocity);
+                            
+                            // Update rotation to face direction
+                            if (animal.velocity.lengthSq() > 0.001) {
+                                animal.rotation = Math.atan2(animal.velocity.x, animal.velocity.z);
+                            }
+                            
+                            // If close enough to attack, change state
+                            const distance = animal.position.distanceTo(animal.target.position);
+                            if (distance <= animal.attackRange) {
+                                animal.state = 'attacking';
+                            }
+                        } else {
+                            animal.state = 'idle';
+                        }
+                        break;
+                    
+                    case 'attacking':
+                        // Attack target
+                        if (animal.target) {
+                            const distance = animal.position.distanceTo(animal.target.position);
+                            
+                            // If too far, go back to charging
+                            if (distance > animal.attackRange) {
+                                animal.state = 'charging';
+                                break;
+                            }
+                            
+                            // Check cooldown
+                            if (this.state.time - animal.lastAttackTime < 1) break;
+                            
+                            // Deal damage
+                            animal.target.health -= animal.attackPower;
+                            
+                            // Check if target died
+                            if (animal.target.health <= 0) {
+                                if (animal.target === this.commander) {
+                                    // Commander died, game over
+                                    this.commander.health = 0;
+                                } else {
+                                    // Fighter died
+                                    animal.target.state = 'dead';
+                                    animal.target.mesh.material.color.set(0x555555); // Gray out
+                                }
+                                animal.target = null;
+                                animal.state = 'idle';
+                            }
+                            
+                            // Reset cooldown
+                            animal.lastAttackTime = this.state.time;
+                            
+                            // Attack effect
+                            this.createAttackEffect(
+                                animal.position.clone().add(new THREE.Vector3(0, 1, 0)),
+                                animal.target.position.clone().add(new THREE.Vector3(0, 1, 0))
+                            );
+                        } else {
+                            animal.state = 'idle';
+                        }
+                        break;
+                }
+                
+                // Update mesh
+                animal.mesh.position.copy(animal.position);
+                animal.mesh.rotation.y = animal.rotation;
+                
+                // Keep in arena bounds
+                const halfSize = this.config.arenaSize / 2 - 1;
+                animal.position.x = Math.max(-halfSize, Math.min(halfSize, animal.position.x));
+                animal.position.z = Math.max(-halfSize, Math.min(halfSize, animal.position.z));
+            }
+            
+            checkBattleEnd() {
+                // Check if animal is defeated
+                if (this.animal && this.animal.health <= 0) {
+                    this.endBattle(true); // Player wins
+                    return;
+                }
+                
+                // Check if commander is defeated
+                if (this.commander && this.commander.health <= 0) {
+                    this.endBattle(false); // Player loses
+                    return;
+                }
+                
+                // Check if all fighters are defeated
+                const allFightersDead = this.state.fighters.every(f => f.state === 'dead');
+                if (this.state.fighters.length > 0 && allFightersDead) {
+                    this.endBattle(false); // Player loses
+                    return;
+                }
+            }
+            
+            updateCamera(delta) {
+                let targetPosition = new THREE.Vector3();
+                
+                switch (this.cameraMode) {
+                    case 'overview':
+                        // Static overview position
+                        this.cameraTarget.set(0, 0, 0);
+                        this.cameraOffset.set(0, 30, 30);
+                        break;
+                    
+                    case 'commander':
+                        // Follow commander
+                        if (this.commander) {
+                            this.cameraTarget.copy(this.commander.position);
+                            this.cameraOffset.set(0, 8, 12);
+                        }
+                        break;
+                    
+                    case 'animal':
+                        // Follow animal
+                        if (this.animal) {
+                            this.cameraTarget.copy(this.animal.position);
+                            this.cameraOffset.set(0, 10, 15);
+                        }
+                        break;
+                }
+                
+                // Calculate target camera position
+                targetPosition.copy(this.cameraTarget).add(this.cameraOffset);
+                
+                // Smoothly move camera
+                this.camera.position.lerp(targetPosition, 5 * delta);
+                
+                // Look at target
+                const lookPosition = this.cameraTarget.clone();
+                lookPosition.y += 1; // Look slightly above feet
+                this.camera.lookAt(lookPosition);
+            }
+            
+            updateDebugInfo() {
+                const debugInfo = document.getElementById('debug-info');
+                
+                debugInfo.innerHTML = `
+                    Phase: ${this.state.phase}<br>
+                    Fighters: ${this.state.fighters.length} (${this.state.fighters.filter(f => f.state !== 'dead').length} alive)<br>
+                    Formation: ${this.formation}<br>
+                    Camera: ${this.cameraMode}<br>
+                    FPS: ${Math.round(this.renderer.info.render.fps || 0)}
+                `;
+                
+                if (this.animal) {
+                    debugInfo.innerHTML += `<br>Animal Health: ${this.animal.health}/${this.animal.maxHealth}`;
+                }
+                
+                if (this.commander) {
+                    debugInfo.innerHTML += `<br>Commander Health: ${this.commander.health}/${this.commander.maxHealth}`;
+                }
+            }
+            
+            animate() {
+                requestAnimationFrame(() => this.animate());
+                
+                // Calculate delta time
+                const delta = Math.min(this.clock.getDelta(), 0.1); // Cap delta to prevent large jumps
+                
+                // Update game
+                this.update(delta);
+                
+                // Render scene
+                this.renderer.render(this.scene, this.camera);
+            }
+        }
+        
+        // Initialize game after page load
+        window.addEventListener('load', () => {
+            try {
+                console.log("Starting battle game");
+                window.game = new BattleGame();
+                console.log("Game started successfully");
+            } catch (error) {
+                console.error("Error starting game:", error);
+                document.body.innerHTML = `
+                    <div style="color: white; padding: 20px; text-align: center;">
+                        <h1>Error Starting Game</h1>
+                        <p>${error.message}</p>
+                        <pre style="text-align: left; background: #333; padding: 10px; margin: 20px; max-width: 80%; overflow: auto;">${error.stack}</pre>
+                    </div>
+                `;
+            }
         });
-      }
-
-      _updateUI() {
-        // Animal health bar
-        const ah = Math.max(0, this.state.animalHealth/200*100);
-        document.getElementById('animal-health-bar').style.width = ah+'%';
-
-        // Fighters alive
-        const alive = this.state.fighters.filter(f=>f.userData.health>0).length;
-        document.getElementById('fighters-alive').textContent = alive;
-      }
-
-      _checkEnd() {
-        if(this.state.phase!=='battle') return;
-        if(this.state.animalHealth<=0||!this.state.fighters.some(f=>f.userData.health>0)) {
-          this.state.phase='result';
-          const title = this.state.animalHealth<=0 ? 'Victory!' : 'Defeat...';
-          document.getElementById('result-title').textContent = title;
-          document.getElementById('result-time').textContent =
-            Math.floor(this.state.timeElapsed/60) + ':' + String(Math.floor(this.state.timeElapsed%60)).padStart(2,'0');
-          document.getElementById('fighters-lost').textContent =
-            this.state.fighters.filter(f=>f.userData.health<=0).length;
-          document.getElementById('result-fighters-total').textContent=this.state.fighters.length;
-          document.getElementById('result-ui').style.display='block';
-        }
-      }
-
-      _reset() {
-        window.location.reload();
-      }
-
-      _onResize() {
-        this.camera.aspect = window.innerWidth/window.innerHeight;
-        this.camera.updateProjectionMatrix();
-        this.renderer.setSize(window.innerWidth, window.innerHeight);
-      }
-
-      _animate() {
-        requestAnimationFrame(()=>this._animate());
-        const delta = this.clock.getDelta();
-        if(this.state.phase==='battle') {
-          this.state.timeElapsed += delta;
-          this.state.fighters.forEach(f=> f.update(delta));
-          this._checkCollisions();
-          this._updateUI();
-          this._checkEnd();
-        } else {
-          // idle rotation
-          this.animal.rotation.y += delta*0.5;
-        }
-        this.renderer.render(this.scene, this.camera);
-      }
-    }
-
-    // Initialization after fake loading
-    let loaded=0, toLoad=5;
-    const loadStep = ()=> {
-      loaded++;
-      document.getElementById('loading-bar').style.width = (loaded/toLoad*100)+'%';
-      if(loaded===toLoad) {
-        setTimeout(()=>{
-          document.getElementById('loading-screen').classList.add('hidden');
-          new BattleSimulator({
-            container: document.getElementById('game-container'),
-            isMobile: /Mobi|Android/i.test(navigator.userAgent)
-          });
-          document.getElementById('setup-ui').style.display='block';
-        },500);
-      }
-    };
-    [300,600,900,1200,1500].forEach(ms=>setTimeout(loadStep, ms));
-  </script>
+    </script>
 </body>
 </html>
